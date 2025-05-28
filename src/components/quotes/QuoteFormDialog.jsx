@@ -12,6 +12,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   const [allProducts, setAllProducts] = useState([]);
   const [newQuote, setNewQuote] = useState({
     customerId: "",
+    quoteNumber: "",
     title: "",
     description: "",
     items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
@@ -36,7 +37,11 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         manualPrice: item.manualPrice || false,
       })) || [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }];
 
-      setNewQuote({ ...quoteToEdit, items });
+      setNewQuote({
+        ...quoteToEdit,
+        quoteNumber: quoteToEdit.quote_number || "",
+        items
+      });
     } else {
       // Set default dates for new quotes
       const today = new Date();
@@ -51,6 +56,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
 
       setNewQuote({
         customerId: "",
+        quoteNumber: "",
         title: "",
         description: "",
         items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
@@ -130,6 +136,18 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         <DialogDescription>Fill in the details for the quote.</DialogDescription>
       </DialogHeader>
       <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+        {quoteToEdit && (
+          <div className="space-y-2">
+            <Label htmlFor="quoteNumber">Quote Number</Label>
+            <Input
+              id="quoteNumber"
+              value={newQuote.quoteNumber}
+              disabled
+              className="bg-gray-50 font-medium text-gray-700"
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="customer">Customer</Label>
@@ -154,18 +172,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
             />
           </div>
         </div>
-
-        {quoteToEdit && (
-          <div className="space-y-2">
-            <Label htmlFor="quoteNumber">Quote Number</Label>
-            <Input
-              id="quoteNumber"
-              value={quoteToEdit.quote_number || ""}
-              disabled
-              className="bg-gray-50"
-            />
-          </div>
-        )}
 
         <div className="space-y-2">
           <Label htmlFor="title">Quote Title</Label>
@@ -228,7 +234,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
                 {newQuote.items.length > 1 && (
-                  <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
