@@ -71,6 +71,7 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .update({
+            title: quoteData.title,
             customer_id: quoteData.customerId,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
@@ -93,6 +94,7 @@ const Quotes = () => {
           .from('quotes')
           .insert([{
             user_id: user.id, // Set the user_id to the authenticated user
+            title: quoteData.title,
             customer_id: quoteData.customerId,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
