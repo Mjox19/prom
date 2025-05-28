@@ -84,19 +84,43 @@ const Settings = () => {
           });
         }
 
+        // First try to get existing preferences
         const { data: prefData, error: prefError } = await supabase
           .from('notification_preferences')
           .select('*')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (prefError) throw prefError;
 
         if (prefData) {
+          // If preferences exist, use them
           setNotificationPrefs(prefData);
+        } else {
+          // If no preferences exist, create default ones
+          const defaultPrefs = {
+            user_id: user.id,
+            email_news: true,
+            email_quotes: true,
+            email_sales: true,
+            push_enabled: false
+          };
+
+          const { error: insertError } = await supabase
+            .from('notification_preferences')
+            .insert([defaultPrefs]);
+
+          if (insertError) throw insertError;
+
+          setNotificationPrefs(defaultPrefs);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load settings. Please try again.",
+          variant: "destructive"
+        });
       }
     };
 
