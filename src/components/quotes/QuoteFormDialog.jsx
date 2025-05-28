@@ -45,9 +45,9 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       // Set default dates for new quotes
       const today = new Date();
       
-      // Valid until - 30 days from today
+      // Valid until - 5 days from today
       const validUntil = new Date(today);
-      validUntil.setDate(validUntil.getDate() + 30);
+      validUntil.setDate(validUntil.getDate() + 5);
       
       // Expected delivery - 15 days from today
       const expectedDelivery = new Date(today);
@@ -166,7 +166,8 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               id="validUntil"
               type="date"
               value={newQuote.validUntil}
-              onChange={(e) => setNewQuote({...newQuote, validUntil: e.target.value})}
+              disabled
+              className="bg-gray-50"
             />
           </div>
         </div>
@@ -222,7 +223,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
                 {newQuote.items.length > 1 && (
-                  <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
