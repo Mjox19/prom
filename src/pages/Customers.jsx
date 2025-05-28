@@ -187,7 +187,6 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
   );
 };
 
-
 const Customers = () => {
   const [customers, setCustomersState] = useState([]);
   const [quotes, setQuotesState] = useState([]);
@@ -260,11 +259,13 @@ const Customers = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="flex flex-col space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-            <DialogTrigger asChild>
-              <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-purple-600 hover:bg-purple-700">
-                <Plus className="h-4 w-4 mr-2" />Add Customer
-              </Button>
-            </DialogTrigger>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-purple-600 hover:bg-purple-700">
+                  <Plus className="h-4 w-4 mr-2" />Add Customer
+                </Button>
+              </DialogTrigger>
+            </Dialog>
             <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input className="pl-10 w-full sm:w-64" placeholder="Search customers..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
