@@ -31,20 +31,22 @@ const Quotes = () => {
 
   const loadPageData = async () => {
     try {
-      // Get quotes that belong to customers where the user is authorized
+      // Get quotes where the user is the customer
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select(`
           *,
           customer:customers(*)
-        `);
+        `)
+        .eq('customer_id', user.id);
 
       if (quotesError) throw quotesError;
 
       // Get customers from the customers table
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('id', user.id); // Only get the current user's customer record
 
       if (customersError) throw customersError;
 
@@ -62,20 +64,11 @@ const Quotes = () => {
 
   const handleFormSubmit = async (quoteData) => {
     try {
-      // Verify that the customer exists and user has access
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', quoteData.customerId)
-        .single();
-
-      if (customerError) throw new Error('Invalid customer selected');
-
       if (editingQuote) {
         const { error } = await supabase
           .from('quotes')
           .update({
-            customer_id: quoteData.customerId,
+            customer_id: user.id, // Always use the current user's ID
             title: quoteData.title,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
@@ -84,7 +77,8 @@ const Quotes = () => {
             valid_until: quoteData.validUntil,
             updated_at: new Date().toISOString()
           })
-          .eq('id', editingQuote.id);
+          .eq('id', editingQuote.id)
+          .eq('customer_id', user.id); // Additional check to ensure ownership
 
         if (error) throw error;
 
@@ -96,7 +90,7 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .insert([{
-            customer_id: quoteData.customerId,
+            customer_id: user.id, // Always use the current user's ID
             title: quoteData.title,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
@@ -135,7 +129,8 @@ const Quotes = () => {
           status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('customer_id', user.id); // Ensure user owns the quote
 
       if (error) throw error;
 
@@ -160,7 +155,8 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .delete()
-          .eq('id', selectedQuote.id);
+          .eq('id', selectedQuote.id)
+          .eq('customer_id', user.id); // Ensure user owns the quote
 
         if (error) throw error;
 
@@ -192,7 +188,7 @@ const Quotes = () => {
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('address')
-        .eq('id', quote.customer_id)
+        .eq('id', user.id)
         .single();
 
       if (customerError) throw customerError;
@@ -200,7 +196,7 @@ const Quotes = () => {
       const { error } = await supabase
         .from('orders')
         .insert([{
-          customer_id: quote.customer_id,
+          customer_id: user.id,
           status: 'pending',
           total_amount: quote.total,
           shipping_address: customer.address || 'Address pending'
@@ -237,9 +233,7 @@ const Quotes = () => {
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const customer = customers.find(c => c.id === quote.customer_id);
-    const customerName = customer ? `${customer.first_name} ${customer.last_name}`.toLowerCase() : "";
-    const matchesSearch = quote.title.toLowerCase().includes(searchTerm.toLowerCase()) || customerName.includes(searchTerm.toLowerCase());
+    const matchesSearch = quote.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? quote.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
