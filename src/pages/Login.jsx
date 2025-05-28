@@ -137,9 +137,9 @@ const Login = () => {
           <p className="text-blue-200">Your complete sales management solution</p>
         </div>
         
-        <Card className="w-full glass-card">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold">Welcome Back</CardTitle>
+            <CardTitle>Welcome Back</CardTitle>
             <CardDescription>Sign in to your account or create a new one</CardDescription>
           </CardHeader>
           <CardContent>
@@ -154,7 +154,6 @@ const Login = () => {
                   placeholder="Enter your email"
                   required
                   disabled={loading}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                 />
               </div>
               <div className="space-y-2">
@@ -167,12 +166,11 @@ const Login = () => {
                   placeholder="Enter your password"
                   required
                   disabled={loading}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
                 />
                 <Button
                   type="button"
                   variant="link"
-                  className="px-0 text-sm text-blue-200 hover:text-blue-100"
+                  className="px-0 text-sm"
                   onClick={handlePasswordReset}
                   disabled={loading}
                 >
@@ -183,13 +181,13 @@ const Login = () => {
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <Button
-              className="w-full bg-white text-indigo-900 hover:bg-white/90"
+              className="w-full"
               onClick={handleLogin}
               disabled={loading}
             >
               {loading ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-900 mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Please wait...
                 </div>
               ) : (
@@ -199,7 +197,7 @@ const Login = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full border-white/20 text-white hover:bg-white/10"
+              className="w-full"
               onClick={handleSignUp}
               disabled={loading}
             >
