@@ -11,9 +11,15 @@ import { getProducts, getProductPriceForQuantity } from "@/lib/productData";
 const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [newQuote, setNewQuote] = useState({
-    customerId: "", title: "", description: "",
+    customerId: "", 
+    title: "", 
+    description: "",
     items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-    subtotal: 0, tax: 0, total: 0, validUntil: ""
+    subtotal: 0, 
+    tax: 0, 
+    total: 0, 
+    validUntil: "",
+    expectedDeliveryDate: ""
   });
 
   useEffect(() => {
@@ -31,15 +37,29 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       })) || [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }];
       setNewQuote({ ...quoteToEdit, items });
     } else {
-      resetNewQuote();
+      // Set default dates for new quotes
+      const today = new Date();
+      const validUntil = new Date(today);
+      validUntil.setDate(validUntil.getDate() + 30); // Valid for 30 days
+
+      const expectedDelivery = new Date(today);
+      expectedDelivery.setDate(expectedDelivery.getDate() + 15); // Delivery in 15 days
+
+      resetNewQuote(validUntil.toISOString().split('T')[0], expectedDelivery.toISOString().split('T')[0]);
     }
   }, [quoteToEdit]);
 
-  const resetNewQuote = () => {
+  const resetNewQuote = (validUntil, expectedDeliveryDate) => {
     setNewQuote({
-      customerId: "", title: "", description: "",
+      customerId: "", 
+      title: "", 
+      description: "",
       items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-      subtotal: 0, tax: 0, total: 0, validUntil: ""
+      subtotal: 0, 
+      tax: 0, 
+      total: 0, 
+      validUntil,
+      expectedDeliveryDate
     });
   };
 
@@ -120,7 +140,12 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
           </div>
           <div className="space-y-2">
             <Label htmlFor="validUntil">Valid Until</Label>
-            <Input id="validUntil" type="date" value={newQuote.validUntil} onChange={(e) => setNewQuote({...newQuote, validUntil: e.target.value})} />
+            <Input 
+              id="validUntil" 
+              type="date" 
+              value={newQuote.validUntil} 
+              onChange={(e) => setNewQuote({...newQuote, validUntil: e.target.value})} 
+            />
           </div>
         </div>
         <div className="space-y-2">
@@ -130,6 +155,15 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" value={newQuote.description} onChange={(e) => setNewQuote({...newQuote, description: e.target.value})} placeholder="Enter quote description" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
+          <Input 
+            id="expectedDeliveryDate" 
+            type="date" 
+            value={newQuote.expectedDeliveryDate} 
+            onChange={(e) => setNewQuote({...newQuote, expectedDeliveryDate: e.target.value})} 
+          />
         </div>
         
         <div className="space-y-4">
@@ -160,7 +194,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               </div>
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
-                {newQuote.items.length > 1 && <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button>}
+                {newQuote.items.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button>}
               </div>
                {item.manualPrice && item.quantity > 10000 && (
                   <div className="col-span-12 text-xs text-amber-600">Manual price entry enabled for quantity over 10,000.</div>
