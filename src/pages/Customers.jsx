@@ -277,6 +277,8 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
 const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) => {
   if (!customer) return null;
 
+  const fullName = `${customer.first_name} ${customer.last_name}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -287,7 +289,7 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) =>
               <User className="h-8 w-8 text-purple-600" />
             </div>
             <div>
-              <h3 className="text-xl font-bold">{customer.full_name}</h3>
+              <h3 className="text-xl font-bold">{fullName}</h3>
               <p className="text-gray-500">{customer.email}</p>
             </div>
           </div>
@@ -375,12 +377,12 @@ const Customers = () => {
 
   const loadData = async () => {
     try {
-      // Get profiles (customers)
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+      // Get customers
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
         .select('*');
 
-      if (profilesError) throw profilesError;
+      if (customersError) throw customersError;
 
       // Get quotes
       const { data: quotesData, error: quotesError } = await supabase
@@ -398,7 +400,7 @@ const Customers = () => {
 
       if (ordersError) throw ordersError;
 
-      setCustomers(profiles || []);
+      setCustomers(customersData || []);
       setQuotes(quotesData || []);
       setOrders(ordersData || []);
     } catch (error) {
@@ -414,11 +416,8 @@ const Customers = () => {
   const handleCreateSubmit = async (formData) => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .insert([{
-          ...formData,
-          role: 'user'
-        }])
+        .from('customers')
+        .insert([formData])
         .select()
         .single();
 
@@ -444,11 +443,8 @@ const Customers = () => {
     if (selectedCustomer) {
       try {
         const { error } = await supabase
-          .from('profiles')
-          .update({
-            ...formData,
-            updated_at: new Date().toISOString()
-          })
+          .from('customers')
+          .update(formData)
           .eq('id', selectedCustomer.id);
 
         if (error) throw error;
@@ -475,7 +471,7 @@ const Customers = () => {
     if (selectedCustomer) {
       try {
         const { error } = await supabase
-          .from('profiles')
+          .from('customers')
           .delete()
           .eq('id', selectedCustomer.id);
 
@@ -559,7 +555,7 @@ const Customers = () => {
                           <TableCell className="font-medium">
                             <div className="flex items-center">
                               <User className="h-4 w-4 text-purple-500 mr-2" />
-                              {customer.full_name}
+                              {`${customer.first_name} ${customer.last_name}`}
                             </div>
                           </TableCell>
                           <TableCell>
