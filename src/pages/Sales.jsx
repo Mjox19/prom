@@ -17,8 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { getSales, addSale, updateSale, deleteSale } from "@/lib/saleData";
-import { getCustomers } from "@/lib/customerData";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit }) => {
   const [currentSale, setCurrentSale] = useState({
@@ -98,8 +98,8 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
 };
 
 const Sales = () => {
-  const [sales, setSalesState] = useState([]);
-  const [customers, setCustomersState] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -107,40 +107,147 @@ const Sales = () => {
   const [selectedSale, setSelectedSale] = useState(null);
   const [editingSale, setEditingSale] = useState(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  useEffect(() => { loadPageData(); }, []);
-
-  const loadPageData = () => {
-    setSalesState(getSales());
-    setCustomersState(getCustomers());
-  };
-
-  const handleFormSubmit = (saleData) => {
-    if (editingSale) {
-      updateSale(editingSale.id, saleData);
-      toast({ title: "Sale Updated", description: "Sale details successfully updated." });
-    } else {
-      addSale(saleData);
-      toast({ title: "Sale Created", description: "New sale added to pipeline." });
-    }
-    loadPageData();
-    setIsFormDialogOpen(false);
-    setEditingSale(null);
-  };
-
-  const handleUpdateStatus = (id, newStatus) => {
-    updateSale(id, { status: newStatus });
-    loadPageData();
-    toast({ title: "Status Updated", description: `Sale status changed to ${newStatus}.` });
-  };
-
-  const handleDeleteSale = () => {
-    if (selectedSale) {
-      deleteSale(selectedSale.id);
+  useEffect(() => {
+    if (user) {
       loadPageData();
-      setIsDeleteDialogOpen(false);
-      setSelectedSale(null);
-      toast({ title: "Sale Deleted", description: "Sale removed from pipeline.", variant: "destructive" });
+    }
+  }, [user]);
+
+  const loadPageData = async () => {
+    try {
+      // Get orders (sales)
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) throw ordersError;
+
+      // Get profiles (customers)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (profilesError) throw profilesError;
+
+      setSales(orders || []);
+      setCustomers(profiles || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load sales data",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFormSubmit = async (saleData) => {
+    try {
+      if (editingSale) {
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            customer_id: saleData.customerId,
+            status: saleData.status,
+            total_amount: saleData.amount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingSale.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Sale Updated",
+          description: "Sale details successfully updated."
+        });
+      } else {
+        const { error } = await supabase
+          .from('orders')
+          .insert([{
+            customer_id: saleData.customerId,
+            status: saleData.status,
+            total_amount: saleData.amount,
+            shipping_address: "TBD" // Required field
+          }]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Sale Created",
+          description: "New sale added to pipeline."
+        });
+      }
+
+      loadPageData();
+      setIsFormDialogOpen(false);
+      setEditingSale(null);
+    } catch (error) {
+      console.error('Error saving sale:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save sale. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      loadPageData();
+      toast({
+        title: "Status Updated",
+        description: `Sale status changed to ${newStatus}.`
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteSale = async () => {
+    if (selectedSale) {
+      try {
+        const { error } = await supabase
+          .from('orders')
+          .delete()
+          .eq('id', selectedSale.id);
+
+        if (error) throw error;
+
+        loadPageData();
+        setIsDeleteDialogOpen(false);
+        setSelectedSale(null);
+        toast({
+          title: "Sale Deleted",
+          description: "Sale removed from pipeline.",
+          variant: "destructive"
+        });
+      } catch (error) {
+        console.error('Error deleting sale:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete sale",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -150,14 +257,17 @@ const Sales = () => {
   };
   
   const filteredSales = sales.filter(sale => {
-    const customer = customers.find(c => c.id === sale.customerId);
-    const customerName = customer ? customer.name.toLowerCase() : "";
-    const matchesSearch = sale.title.toLowerCase().includes(searchTerm.toLowerCase()) || customerName.includes(searchTerm.toLowerCase());
+    const customer = customers.find(c => c.id === sale.customer_id);
+    const customerName = customer ? customer.full_name.toLowerCase() : "";
+    const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase()) || customerName.includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? sale.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
 
-  const getCustomerName = (customerId) => customers.find(c => c.id === customerId)?.name || "Unknown";
+  const getCustomerName = (customerId) => {
+    const customer = customers.find(c => c.id === customerId);
+    return customer ? customer.full_name : "Unknown";
+  };
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}};
@@ -186,7 +296,9 @@ const Sales = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All Statuses</SelectItem>
-                  {["lead", "negotiation", "won", "lost"].map(s=><SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
+                  {["pending", "processing", "shipped", "delivered", "cancelled"].map(s => (
+                    <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -198,32 +310,74 @@ const Sales = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Sale</TableHead><TableHead>Customer</TableHead><TableHead>Expected Close</TableHead>
-                      <TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Sale</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Created Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredSales.length > 0 ? (
                       filteredSales.map((sale) => (
                         <motion.tr key={sale.id} variants={itemVariants} className="border-b hover:bg-gray-50">
-                          <TableCell className="font-medium"><div className="flex items-center"><TrendingUp className="h-4 w-4 text-green-500 mr-2" />{sale.title}</div></TableCell>
-                          <TableCell><div className="flex items-center"><User className="h-4 w-4 text-gray-400 mr-2" />{getCustomerName(sale.customerId)}</div></TableCell>
-                          <TableCell><div className="flex items-center text-gray-500"><Calendar className="h-3 w-3 mr-1" />{sale.expectedCloseDate ? new Date(sale.expectedCloseDate).toLocaleDateString() : 'N/A'}</div></TableCell>
-                          <TableCell><div className="flex items-center"><DollarSign className="h-4 w-4 text-gray-400" />{sale.amount?.toLocaleString()}</div></TableCell>
-                          <TableCell><span className={`status-badge status-${sale.status}`}>{sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}</span></TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center">
+                              <TrendingUp className="h-4 w-4 text-green-500 mr-2" />
+                              {sale.title || `Order #${sale.id.slice(0, 8)}`}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <User className="h-4 w-4 text-gray-400 mr-2" />
+                              {getCustomerName(sale.customer_id)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center text-gray-500">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(sale.created_at).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <DollarSign className="h-4 w-4 text-gray-400" />
+                              {sale.total_amount?.toLocaleString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`status-badge status-${sale.status}`}>
+                              {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
-                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(sale)} title="Edit Sale"><Edit className="h-4 w-4 text-amber-500" /></Button>
-                              {sale.status !== 'won' && sale.status !== 'lost' && (<>
-                                <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'won')} title="Won"><CheckCircle className="h-4 w-4 text-green-500" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'lost')} title="Lost"><XCircle className="h-4 w-4 text-red-500" /></Button>
-                              </>)}
-                              <Button variant="ghost" size="icon" onClick={() => {setSelectedSale(sale); setIsDeleteDialogOpen(true);}} title="Delete"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(sale)} title="Edit Sale">
+                                <Edit className="h-4 w-4 text-amber-500" />
+                              </Button>
+                              {sale.status !== 'delivered' && sale.status !== 'cancelled' && (
+                                <>
+                                  <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'delivered')} title="Mark as Delivered">
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'cancelled')} title="Mark as Cancelled">
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button variant="ghost" size="icon" onClick={() => {setSelectedSale(sale); setIsDeleteDialogOpen(true);}} title="Delete">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
                             </div>
                           </TableCell>
                         </motion.tr>
                       ))
-                    ) : (<TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-500">No sales found.</TableCell></TableRow>)}
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">No sales found.</TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -232,12 +386,24 @@ const Sales = () => {
         </div>
       </div>
 
-      <SaleFormDialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen} customers={customers} onSubmit={handleFormSubmit} saleToEdit={editingSale}/>
+      <SaleFormDialog 
+        open={isFormDialogOpen} 
+        onOpenChange={setIsFormDialogOpen} 
+        customers={customers} 
+        onSubmit={handleFormSubmit} 
+        saleToEdit={editingSale}
+      />
       
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Confirm Deletion</DialogTitle><DialogDescription>This action cannot be undone.</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button><Button variant="destructive" onClick={handleDeleteSale}>Delete</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteSale}>Delete</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
