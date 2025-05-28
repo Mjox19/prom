@@ -40,6 +40,12 @@ const Settings = () => {
   const { user } = useAuth();
   const [activeSection, setActiveSection] = React.useState("profile");
   const [loading, setLoading] = React.useState(false);
+  const [notificationPrefs, setNotificationPrefs] = React.useState({
+    email_news: true,
+    email_quotes: true,
+    email_sales: true,
+    push_enabled: false
+  });
   
   // Get display name from email
   const displayName = user?.email 
@@ -60,25 +66,37 @@ const Settings = () => {
   React.useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (error) throw error;
+        if (profileError) throw profileError;
 
-        if (data) {
-          const names = data.full_name ? data.full_name.split(' ') : [formData.firstName, formData.lastName];
+        if (profileData) {
+          const names = profileData.full_name ? profileData.full_name.split(' ') : [formData.firstName, formData.lastName];
           setFormData({
             firstName: names[0] || '',
             lastName: names.slice(1).join(' ') || '',
             email: user.email,
-            bio: data.bio || formData.bio
+            bio: profileData.bio || formData.bio
           });
         }
+
+        const { data: prefData, error: prefError } = await supabase
+          .from('notification_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (prefError) throw prefError;
+
+        if (prefData) {
+          setNotificationPrefs(prefData);
+        }
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
@@ -88,9 +106,9 @@ const Settings = () => {
   }, [user]);
 
   const handleSave = async (sectionName) => {
-    if (sectionName === "Profile") {
-      setLoading(true);
-      try {
+    setLoading(true);
+    try {
+      if (sectionName === "Profile") {
         const { error } = await supabase
           .from('profiles')
           .upsert({
@@ -106,22 +124,58 @@ const Settings = () => {
           title: "Profile Updated",
           description: "Your profile has been successfully updated.",
         });
-      } catch (error) {
-        console.error('Error updating profile:', error);
+      } else if (sectionName === "Notifications") {
+        const { error } = await supabase
+          .from('notification_preferences')
+          .upsert({
+            user_id: user.id,
+            ...notificationPrefs,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+
+        if ('Notification' in window && notificationPrefs.push_enabled) {
+          const permission = await Notification.requestPermission();
+          if (permission === 'granted') {
+            toast({
+              title: "Push Notifications Enabled",
+              description: "You will now receive push notifications.",
+            });
+          } else {
+            setNotificationPrefs(prev => ({ ...prev, push_enabled: false }));
+            toast({
+              title: "Push Notifications Disabled",
+              description: "Please enable notifications in your browser settings.",
+              variant: "destructive"
+            });
+          }
+        }
+
         toast({
-          title: "Error",
-          description: "Failed to update profile. Please try again.",
-          variant: "destructive"
+          title: "Notification Settings Saved",
+          description: "Your notification preferences have been updated.",
         });
-      } finally {
-        setLoading(false);
+      } else {
+        toast({
+          title: "Settings Saved",
+          description: `Your ${sectionName} settings have been successfully saved.`,
+        });
       }
-    } else {
+    } catch (error) {
+      console.error('Error saving settings:', error);
       toast({
-        title: "Settings Saved",
-        description: `Your ${sectionName} settings have been successfully saved.`,
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+        variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleNotificationChange = (key, value) => {
+    setNotificationPrefs(prev => ({ ...prev, [key]: value }));
   };
 
   const containerVariants = {
@@ -129,7 +183,7 @@ const Settings = () => {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.07
+        staggerChildren: 0.1
       }
     }
   };
@@ -220,28 +274,65 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label className="text-base font-medium">Email Notifications</Label>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="emailNews" defaultChecked className="form-checkbox h-5 w-5 text-indigo-600" />
+                  <input 
+                    type="checkbox" 
+                    id="emailNews" 
+                    checked={notificationPrefs.email_news}
+                    onChange={(e) => handleNotificationChange('email_news', e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-indigo-600" 
+                  />
                   <Label htmlFor="emailNews" className="font-normal">News and Updates</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="emailQuotes" defaultChecked className="form-checkbox h-5 w-5 text-indigo-600" />
+                  <input 
+                    type="checkbox" 
+                    id="emailQuotes" 
+                    checked={notificationPrefs.email_quotes}
+                    onChange={(e) => handleNotificationChange('email_quotes', e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-indigo-600" 
+                  />
                   <Label htmlFor="emailQuotes" className="font-normal">Quote Status Changes</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="emailSales" defaultChecked className="form-checkbox h-5 w-5 text-indigo-600" />
+                  <input 
+                    type="checkbox" 
+                    id="emailSales" 
+                    checked={notificationPrefs.email_sales}
+                    onChange={(e) => handleNotificationChange('email_sales', e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-indigo-600" 
+                  />
                   <Label htmlFor="emailSales" className="font-normal">Sale Milestones</Label>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-base font-medium">Push Notifications</Label>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="pushAll" className="form-checkbox h-5 w-5 text-indigo-600" />
+                  <input 
+                    type="checkbox" 
+                    id="pushAll" 
+                    checked={notificationPrefs.push_enabled}
+                    onChange={(e) => handleNotificationChange('push_enabled', e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-indigo-600" 
+                  />
                   <Label htmlFor="pushAll" className="font-normal">Enable Push Notifications</Label>
                 </div>
               </div>
-              <Button onClick={() => handleSave("Notification")} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
-                <Save className="h-4 w-4 mr-2" />
-                Save Notifications
+              <Button 
+                onClick={() => handleSave("Notifications")} 
+                className="mt-4 bg-indigo-600 hover:bg-indigo-700"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="animate-spin mr-2">⌛</span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Notification Settings
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
