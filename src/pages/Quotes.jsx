@@ -8,13 +8,12 @@ import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import QuoteFormDialog from "@/components/quotes/QuoteFormDialog";
 import QuoteTable from "@/components/quotes/QuoteTable";
-import { getQuotes, addQuote, updateQuote, deleteQuote } from "@/lib/quoteData";
-import { getCustomers } from "@/lib/customerData";
-import { convertQuoteToSale } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Quotes = () => {
-  const [quotes, setQuotesState] = useState([]);
-  const [customers, setCustomersState] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -22,54 +21,187 @@ const Quotes = () => {
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [editingQuote, setEditingQuote] = useState(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadPageData();
-  }, []);
-
-  const loadPageData = () => {
-    setQuotesState(getQuotes());
-    setCustomersState(getCustomers());
-  };
-
-  const resetEditingQuoteState = () => {
-    setEditingQuote(null);
-  };
-
-  const handleFormSubmit = (quoteData) => {
-    if (editingQuote) {
-      updateQuote(editingQuote.id, quoteData);
-      toast({ title: "Quote Updated", description: "The quote has been successfully updated." });
-    } else {
-      addQuote(quoteData);
-      toast({ title: "Quote Created", description: "The quote has been successfully created." });
+    if (user) {
+      loadPageData();
     }
-    loadPageData();
-    setIsFormDialogOpen(false);
-    resetEditingQuoteState();
-  };
-  
-  const handleUpdateStatus = (id, newStatus) => {
-    updateQuote(id, { status: newStatus });
-    loadPageData();
-    toast({ title: "Status Updated", description: `Quote status updated to ${newStatus}.` });
+  }, [user]);
+
+  const loadPageData = async () => {
+    try {
+      // Get quotes
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', user.id);
+
+      if (quotesError) throw quotesError;
+
+      // Get customers - now using the customers table
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*');
+
+      if (customersError) throw customersError;
+
+      setQuotes(quotesData || []);
+      setCustomers(customersData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load quotes data",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDeleteQuote = () => {
+  const handleFormSubmit = async (quoteData) => {
+    try {
+      if (editingQuote) {
+        const { error } = await supabase
+          .from('quotes')
+          .update({
+            customer_id: quoteData.customerId,
+            title: quoteData.title,
+            description: quoteData.description,
+            subtotal: quoteData.subtotal,
+            tax: quoteData.tax,
+            total: quoteData.total,
+            valid_until: quoteData.validUntil,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingQuote.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Quote Updated",
+          description: "The quote has been successfully updated."
+        });
+      } else {
+        const { error } = await supabase
+          .from('quotes')
+          .insert([{
+            customer_id: quoteData.customerId,
+            title: quoteData.title,
+            description: quoteData.description,
+            subtotal: quoteData.subtotal,
+            tax: quoteData.tax,
+            total: quoteData.total,
+            valid_until: quoteData.validUntil
+          }]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Quote Created",
+          description: "The quote has been successfully created."
+        });
+      }
+
+      loadPageData();
+      setIsFormDialogOpen(false);
+      setEditingQuote(null);
+    } catch (error) {
+      console.error('Error saving quote:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save quote. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      loadPageData();
+      toast({
+        title: "Status Updated",
+        description: `Quote status updated to ${newStatus}.`
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteQuote = async () => {
     if (selectedQuote) {
-      deleteQuote(selectedQuote.id);
-      loadPageData();
-      setIsDeleteDialogOpen(false);
-      setSelectedQuote(null);
-      toast({ title: "Quote Deleted", description: "The quote has been successfully deleted.", variant: "destructive" });
+      try {
+        const { error } = await supabase
+          .from('quotes')
+          .delete()
+          .eq('id', selectedQuote.id);
+
+        if (error) throw error;
+
+        loadPageData();
+        setIsDeleteDialogOpen(false);
+        setSelectedQuote(null);
+        toast({
+          title: "Quote Deleted",
+          description: "The quote has been successfully deleted.",
+          variant: "destructive"
+        });
+      } catch (error) {
+        console.error('Error deleting quote:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete quote",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const handleConvertToSale = (quoteId) => {
-    const newSale = convertQuoteToSale(quoteId);
-    if (newSale) {
+  const handleConvertToSale = async (quoteId) => {
+    try {
+      const quote = quotes.find(q => q.id === quoteId);
+      if (!quote) throw new Error('Quote not found');
+
+      const { error } = await supabase
+        .from('orders')
+        .insert([{
+          customer_id: quote.customer_id,
+          status: 'pending',
+          total_amount: quote.total,
+          shipping_address: 'TBD' // Required field
+        }]);
+
+      if (error) throw error;
+
+      // Update quote status
+      await handleUpdateStatus(quoteId, 'accepted');
+
       loadPageData();
-      toast({ title: "Converted to Sale", description: "Quote successfully converted." });
+      toast({
+        title: "Quote Converted",
+        description: "Quote successfully converted to sale."
+      });
+    } catch (error) {
+      console.error('Error converting quote to sale:', error);
+      toast({
+        title: "Error",
+        description: "Failed to convert quote to sale",
+        variant: "destructive"
+      });
     }
   };
   
@@ -84,8 +216,8 @@ const Quotes = () => {
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const customer = customers.find(c => c.id === quote.customerId);
-    const customerName = customer ? customer.name.toLowerCase() : "";
+    const customer = customers.find(c => c.id === quote.customer_id);
+    const customerName = customer ? `${customer.first_name} ${customer.last_name}`.toLowerCase() : "";
     const matchesSearch = quote.title.toLowerCase().includes(searchTerm.toLowerCase()) || customerName.includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? quote.status === statusFilter : true;
     return matchesSearch && matchesStatus;
@@ -99,10 +231,10 @@ const Quotes = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
             <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
               setIsFormDialogOpen(isOpen);
-              if (!isOpen) resetEditingQuoteState();
+              if (!isOpen) setEditingQuote(null);
             }}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingQuote(null); /* setIsFormDialogOpen(true) is handled by DialogTrigger */ }} className="bg-indigo-600 hover:bg-indigo-700">
+                <Button onClick={() => { setEditingQuote(null); }} className="bg-indigo-600 hover:bg-indigo-700">
                   <Plus className="h-4 w-4 mr-2" />Create Quote
                 </Button>
               </DialogTrigger>
@@ -151,8 +283,14 @@ const Quotes = () => {
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader><DialogTitle>Confirm Deletion</DialogTitle><DialogDescription>This action cannot be undone.</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button><Button variant="destructive" onClick={handleDeleteQuote}>Delete</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteQuote}>Delete</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
