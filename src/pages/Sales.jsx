@@ -168,11 +168,13 @@ const Sales = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="flex flex-col space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingSale(null); setIsFormDialogOpen(true); }} className="bg-green-600 hover:bg-green-700">
-              <Plus className="h-4 w-4 mr-2" />Add Sale
-            </Button>
-          </DialogTrigger>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button onClick={() => { setEditingSale(null); setIsFormDialogOpen(true); }} className="bg-green-600 hover:bg-green-700">
+                  <Plus className="h-4 w-4 mr-2" />Add Sale
+                </Button>
+              </DialogTrigger>
+            </Dialog>
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
