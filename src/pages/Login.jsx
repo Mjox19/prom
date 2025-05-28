@@ -19,7 +19,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -28,9 +28,10 @@ const Login = () => {
       
       navigate('/');
     } catch (error) {
+      console.error('Login error:', error);
       toast({
-        title: "Error",
-        description: "Invalid email or password. Please try again or reset your password if you've forgotten it.",
+        title: "Login Failed",
+        description: error.message || "Invalid email or password. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -41,9 +42,18 @@ const Login = () => {
   const handleSignUp = async (e) => {
     e.preventDefault();
     
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (password.length < 6) {
       toast({
-        title: "Error",
+        title: "Validation Error",
         description: "Password must be at least 6 characters long",
         variant: "destructive"
       });
@@ -53,9 +63,16 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            first_name: email.split('@')[0],
+            last_name: '',
+          }
+        }
       });
 
       if (error) throw error;
@@ -65,11 +82,10 @@ const Login = () => {
         description: "Account created successfully. You can now sign in.",
       });
     } catch (error) {
+      console.error('Signup error:', error);
       toast({
-        title: "Error",
-        description: error.message === "User already registered" 
-          ? "An account with this email already exists. Please sign in instead."
-          : "Failed to create account. Please try again.",
+        title: "Signup Failed",
+        description: error.message || "Failed to create account. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -81,7 +97,7 @@ const Login = () => {
     e.preventDefault();
     if (!email) {
       toast({
-        title: "Error",
+        title: "Email Required",
         description: "Please enter your email address to reset your password.",
         variant: "destructive"
       });
@@ -98,13 +114,14 @@ const Login = () => {
       if (error) throw error;
       
       toast({
-        title: "Success",
+        title: "Password Reset Email Sent",
         description: "Check your email for the password reset link.",
       });
     } catch (error) {
+      console.error('Password reset error:', error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Reset Failed",
+        description: error.message || "Failed to send reset email. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -114,7 +131,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-blue-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md glass-card">
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Welcome to QuoteSales Pro</CardTitle>
           <CardDescription>Sign in to your account or create a new one</CardDescription>
@@ -130,6 +147,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -141,6 +159,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
+                disabled={loading}
               />
               <Button
                 type="button"
@@ -160,7 +179,7 @@ const Login = () => {
             onClick={handleLogin}
             disabled={loading}
           >
-            {loading ? "Loading..." : "Sign In"}
+            {loading ? "Please wait..." : "Sign In"}
           </Button>
           <Button
             type="button"
