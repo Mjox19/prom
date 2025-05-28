@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, LogOut, Package } from 'lucide-react';
+import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, LogOut, Package, Truck } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -12,6 +12,7 @@ const navItems = [
   { icon: TrendingUp, label: "Sales", path: "/sales" },
   { icon: Users, label: "Customers", path: "/customers" },
   { icon: Package, label: "Products", path: "/products" },
+  { icon: Truck, label: "Orders & Deliveries", path: "/orders" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
