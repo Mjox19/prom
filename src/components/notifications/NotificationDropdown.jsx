@@ -11,58 +11,66 @@ const NotificationDropdown = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      
-      // Subscribe to all notification changes
-      const channel = supabase
-        .channel('notification-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            if (payload.eventType === 'INSERT') {
-              setNotifications(prev => [payload.new, ...prev]);
-              if (!payload.new.read) {
-                setUnreadCount(prev => prev + 1);
-                // Show browser notification if enabled
-                if (Notification.permission === 'granted') {
-                  new Notification(payload.new.title, {
-                    body: payload.new.message,
-                    icon: '/vite.svg'
-                  });
-                }
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              setNotifications(prev =>
-                prev.map(n => n.id === payload.new.id ? payload.new : n)
-              );
-              // Update unread count if read status changed
-              if (payload.old.read !== payload.new.read) {
-                setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
-              }
-            } else if (payload.eventType === 'DELETE') {
-              setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
-              if (!payload.old.read) {
-                setUnreadCount(prev => Math.max(0, prev - 1));
+    // Only proceed if we have a valid authenticated user
+    if (!user?.id) {
+      return;
+    }
+
+    fetchNotifications();
+    
+    // Subscribe to all notification changes
+    const channel = supabase
+      .channel('notification-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotifications(prev => [payload.new, ...prev]);
+            if (!payload.new.read) {
+              setUnreadCount(prev => prev + 1);
+              // Show browser notification if enabled
+              if (Notification.permission === 'granted') {
+                new Notification(payload.new.title, {
+                  body: payload.new.message,
+                  icon: '/vite.svg'
+                });
               }
             }
+          } else if (payload.eventType === 'UPDATE') {
+            setNotifications(prev =>
+              prev.map(n => n.id === payload.new.id ? payload.new : n)
+            );
+            // Update unread count if read status changed
+            if (payload.old.read !== payload.new.read) {
+              setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+            if (!payload.old.read) {
+              setUnreadCount(prev => Math.max(0, prev - 1));
+            }
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const fetchNotifications = async () => {
+    // Don't attempt to fetch if there's no user
+    if (!user?.id) {
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -71,25 +79,31 @@ const NotificationDropdown = () => {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching notifications:', error);
+        return;
+      }
 
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.read).length);
+      setNotifications(data || []);
+      setUnreadCount((data || []).filter(n => !n.read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
   const markAsRead = async (id) => {
+    if (!user?.id) return;
+
     try {
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id); // Additional security check
 
-      if (error) throw error;
-
-      // No need to manually update state as it will be handled by the subscription
+      if (error) {
+        console.error('Error marking notification as read:', error);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -133,6 +147,11 @@ const NotificationDropdown = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
+
+  // Don't render anything if there's no authenticated user
+  if (!user?.id) {
+    return null;
+  }
 
   return (
     <div className="relative notification-dropdown">
