@@ -1,8 +1,10 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, LogOut, Package } from 'lucide-react';
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 const navItems = [
   { icon: BarChart3, label: "Dashboard", path: "/" },
@@ -15,6 +17,26 @@ const navItems = [
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="h-screen w-64 bg-gradient-to-b from-indigo-900 to-blue-800 text-white flex flex-col">
@@ -63,10 +85,13 @@ const Sidebar = () => {
           <HelpCircle className="h-5 w-5 mr-3 text-blue-200" />
           <span className="text-blue-100">Help & Support</span>
         </div>
-        <div className="flex items-center px-4 py-2 rounded-lg hover:bg-white/5 cursor-pointer">
+        <button
+          onClick={handleLogout}
+          className="flex items-center w-full px-4 py-2 rounded-lg hover:bg-white/5 cursor-pointer"
+        >
           <LogOut className="h-5 w-5 mr-3 text-blue-200" />
           <span className="text-blue-100">Logout</span>
-        </div>
+        </button>
       </div>
     </div>
   );
