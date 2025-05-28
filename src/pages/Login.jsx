@@ -30,7 +30,7 @@ const Login = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: "Invalid email or password. Please try again or reset your password if you've forgotten it.",
         variant: "destructive"
       });
     } finally {
@@ -56,6 +56,41 @@ const Login = () => {
       toast({
         title: "Success",
         description: "Check your email for the confirmation link.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address to reset your password.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Check your email for the password reset link.",
       });
     } catch (error) {
       toast({
@@ -98,6 +133,15 @@ const Login = () => {
                 placeholder="Enter your password"
                 required
               />
+              <Button
+                type="button"
+                variant="link"
+                className="px-0 text-sm text-indigo-600 hover:text-indigo-800"
+                onClick={handlePasswordReset}
+                disabled={loading}
+              >
+                Forgot password?
+              </Button>
             </div>
           </form>
         </CardContent>
