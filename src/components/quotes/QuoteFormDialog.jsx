@@ -223,7 +223,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
                 {newQuote.items.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
+                  <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
