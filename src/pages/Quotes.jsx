@@ -39,7 +39,7 @@ const Quotes = () => {
 
       if (quotesError) throw quotesError;
 
-      // Get customers - now using the customers table
+      // Get customers from the customers table
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('*');
