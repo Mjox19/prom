@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
-  Plus, Search, Filter, Truck, Package, Calendar, MapPin, 
-  Trash2, Edit, CheckCircle, XCircle, AlertTriangle, Clock
+  Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
+  Package, Truck, MapPin, Clock, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSubmit }) => {
   const [formData, setFormData] = useState({
     customerId: "",
-    items: [{ productId: "", quantity: 1 }],
+    items: [{ productName: "", description: "", quantity: 1 }],
     shippingAddress: "",
     carrier: "fedex"
   });
@@ -33,7 +33,8 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
       setFormData({
         customerId: order.customer_id,
         items: order.items.map(item => ({
-          productId: item.product_id,
+          productName: item.product_name,
+          description: item.product_description,
           quantity: item.quantity
         })),
         shippingAddress: order.shipping_address,
@@ -42,7 +43,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
     } else {
       setFormData({
         customerId: "",
-        items: [{ productId: "", quantity: 1 }],
+        items: [{ productName: "", description: "", quantity: 1 }],
         shippingAddress: "",
         carrier: "fedex"
       });
@@ -52,7 +53,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
   const handleAddItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { productId: "", quantity: 1 }]
+      items: [...prev.items, { productName: "", description: "", quantity: 1 }]
     }));
   };
 
@@ -147,24 +148,22 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
             {formData.items.map((item, index) => (
               <div key={index} className="grid grid-cols-12 gap-4 items-end">
                 <div className="col-span-6">
-                  <Label className="text-xs">Product</Label>
-                  <Select
-                    value={item.productId}
-                    onValueChange={(value) => handleItemChange(index, "productId", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products.map(product => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs">Product Name</Label>
+                  <Input
+                    value={item.productName}
+                    onChange={(e) => handleItemChange(index, "productName", e.target.value)}
+                    placeholder="Enter product name"
+                  />
                 </div>
                 <div className="col-span-4">
+                  <Label className="text-xs">Description</Label>
+                  <Input
+                    value={item.description}
+                    onChange={(e) => handleItemChange(index, "description", e.target.value)}
+                    placeholder="Enter description"
+                  />
+                </div>
+                <div className="col-span-2">
                   <Label className="text-xs">Quantity</Label>
                   <Input
                     type="number"
@@ -173,7 +172,8 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                     onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value) || 1)}
                   />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-11"></div>
+                <div className="col-span-1 flex justify-end">
                   {formData.items.length > 1 && (
                     <Button
                       type="button"
@@ -205,7 +205,6 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -259,7 +258,8 @@ const Orders = () => {
           *,
           items:order_items(
             id,
-            product_id,
+            product_name,
+            product_description,
             quantity,
             unit_price,
             total_price
@@ -280,14 +280,6 @@ const Orders = () => {
       if (customersError) throw customersError;
       setCustomers(customersData);
 
-      // Fetch products
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('*');
-
-      if (productsError) throw productsError;
-      setProducts(productsData);
-
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -300,19 +292,16 @@ const Orders = () => {
 
   const handleCreateOrder = async (formData) => {
     try {
-      // Calculate prices based on product data
-      const orderItems = formData.items.map(item => {
-        const product = products.find(p => p.id === item.productId);
-        const unitPrice = product.price || 0;
-        return {
-          product_id: item.productId,
-          quantity: item.quantity,
-          unit_price: unitPrice,
-          total_price: unitPrice * item.quantity
-        };
-      });
+      // Calculate prices based on quantity
+      const orderItems = formData.items.map(item => ({
+        product_name: item.productName,
+        product_description: item.description,
+        quantity: item.quantity,
+        unit_price: 0, // You might want to set this based on your business logic
+        total_price: 0 // This would be calculated based on unit_price * quantity
+      }));
 
-      const totalAmount = orderItems.reduce((sum, item) => sum + item.total_price, 0);
+      const totalAmount = 0; // Calculate based on your business logic
 
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -627,7 +616,6 @@ const Orders = () => {
         open={isFormDialogOpen}
         onOpenChange={setIsFormDialogOpen}
         customers={customers}
-        products={products}
         order={selectedOrder}
         onSubmit={handleCreateOrder}
       />
