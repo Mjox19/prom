@@ -31,14 +31,14 @@ const Quotes = () => {
 
   const loadPageData = async () => {
     try {
-      // Get quotes where the user is the customer
+      // Get quotes where the user is the creator
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select(`
           *,
           customer:customers(*)
         `)
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);
 
       if (quotesError) throw quotesError;
 
@@ -80,7 +80,7 @@ const Quotes = () => {
             updated_at: new Date().toISOString()
           })
           .eq('id', editingQuote.id)
-          .eq('customer_id', user.id); // Additional check to ensure ownership
+          .eq('user_id', user.id); // Check user ownership
 
         if (error) throw error;
 
@@ -92,6 +92,7 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .insert([{
+            user_id: user.id, // Set the user_id to the authenticated user
             customer_id: quoteData.customerId,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
@@ -131,7 +132,7 @@ const Quotes = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .eq('customer_id', user.id); // Ensure user owns the quote
+        .eq('user_id', user.id); // Check user ownership
 
       if (error) throw error;
 
@@ -157,7 +158,7 @@ const Quotes = () => {
           .from('quotes')
           .delete()
           .eq('id', selectedQuote.id)
-          .eq('customer_id', user.id); // Ensure user owns the quote
+          .eq('user_id', user.id); // Check user ownership
 
         if (error) throw error;
 
