@@ -1,11 +1,23 @@
-
 import React from "react";
 import { Bell, Search, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Header = ({ title }) => {
+  const { user } = useAuth();
+  
+  // Get user's email and create initials from it
+  const email = user?.email || '';
+  const initials = email
+    .split('@')[0]
+    .split('.')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
       <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
@@ -27,11 +39,11 @@ const Header = ({ title }) => {
         <div className="flex items-center space-x-2">
           <Avatar className="h-8 w-8 border border-gray-200">
             <AvatarFallback className="bg-indigo-100 text-indigo-800">
-              <User className="h-4 w-4" />
+              {initials}
             </AvatarFallback>
           </Avatar>
           <div className="text-sm">
-            <p className="font-medium text-gray-700">Admin User</p>
+            <p className="font-medium text-gray-700">{email}</p>
           </div>
         </div>
       </div>
