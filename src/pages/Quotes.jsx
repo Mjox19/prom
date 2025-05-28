@@ -45,8 +45,7 @@ const Quotes = () => {
       // Get customers from the customers table
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
-        .select('*')
-        .eq('id', user.id); // Only get the current user's customer record
+        .select('*');
 
       if (customersError) throw customersError;
 
@@ -64,17 +63,20 @@ const Quotes = () => {
 
   const handleFormSubmit = async (quoteData) => {
     try {
+      // Set valid_until to 5 days from now
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 5);
+
       if (editingQuote) {
         const { error } = await supabase
           .from('quotes')
           .update({
-            customer_id: user.id, // Always use the current user's ID
-            title: quoteData.title,
+            customer_id: quoteData.customerId,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
             total: quoteData.total,
-            valid_until: quoteData.validUntil,
+            valid_until: validUntil.toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', editingQuote.id)
@@ -90,13 +92,12 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .insert([{
-            customer_id: user.id, // Always use the current user's ID
-            title: quoteData.title,
+            customer_id: quoteData.customerId,
             description: quoteData.description,
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
             total: quoteData.total,
-            valid_until: quoteData.validUntil,
+            valid_until: validUntil.toISOString(),
             status: 'draft' // Explicitly set initial status
           }]);
 
@@ -188,7 +189,7 @@ const Quotes = () => {
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('address')
-        .eq('id', user.id)
+        .eq('id', quote.customer_id)
         .single();
 
       if (customerError) throw customerError;
@@ -196,7 +197,7 @@ const Quotes = () => {
       const { error } = await supabase
         .from('orders')
         .insert([{
-          customer_id: user.id,
+          customer_id: quote.customer_id,
           status: 'pending',
           total_amount: quote.total,
           shipping_address: customer.address || 'Address pending'
@@ -233,7 +234,7 @@ const Quotes = () => {
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = quote.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? quote.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
