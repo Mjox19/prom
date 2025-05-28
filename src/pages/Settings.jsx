@@ -69,9 +69,10 @@ const Settings = () => {
         if (error) throw error;
 
         if (data) {
+          const names = data.full_name ? data.full_name.split(' ') : [formData.firstName, formData.lastName];
           setFormData({
-            firstName: data.full_name ? data.full_name.split(' ')[0] : formData.firstName,
-            lastName: data.full_name ? data.full_name.split(' ')[1] || '' : formData.lastName,
+            firstName: names[0] || '',
+            lastName: names.slice(1).join(' ') || '',
             email: user.email,
             bio: data.bio || formData.bio
           });
