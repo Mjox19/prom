@@ -109,7 +109,13 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
             <Label htmlFor="customer">Customer</Label>
             <Select value={newQuote.customerId} onValueChange={(value) => setNewQuote({...newQuote, customerId: value})}>
               <SelectTrigger id="customer"><SelectValue placeholder="Select customer" /></SelectTrigger>
-              <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {customers.map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {`${c.first_name} ${c.last_name} - ${c.company_name}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
