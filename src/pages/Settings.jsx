@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const settingsSections = [
   { id: "profile", label: "Profile", icon: User, description: "Update your personal information." },
@@ -38,6 +39,7 @@ const Settings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeSection, setActiveSection] = React.useState("profile");
+  const [loading, setLoading] = React.useState(false);
   
   // Get display name from email
   const displayName = user?.email 
@@ -55,11 +57,70 @@ const Settings = () => {
     bio: "Dedicated sales professional managing quotes and deals."
   });
 
-  const handleSave = (sectionName) => {
-    toast({
-      title: "Settings Saved",
-      description: `Your ${sectionName} settings have been successfully saved.`,
-    });
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setFormData({
+            firstName: data.full_name ? data.full_name.split(' ')[0] : formData.firstName,
+            lastName: data.full_name ? data.full_name.split(' ')[1] || '' : formData.lastName,
+            email: user.email,
+            bio: data.bio || formData.bio
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
+  const handleSave = async (sectionName) => {
+    if (sectionName === "Profile") {
+      setLoading(true);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+            bio: formData.bio,
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been successfully updated.",
+        });
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      toast({
+        title: "Settings Saved",
+        description: `Your ${sectionName} settings have been successfully saved.`,
+      });
+    }
   };
 
   const containerVariants = {
@@ -127,9 +188,22 @@ const Settings = () => {
                   placeholder="Tell us a little about yourself" 
                 />
               </div>
-              <Button onClick={() => handleSave("Profile")} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
-                <Save className="h-4 w-4 mr-2" />
-                Save Profile
+              <Button 
+                onClick={() => handleSave("Profile")} 
+                className="mt-4 bg-indigo-600 hover:bg-indigo-700"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="animate-spin mr-2">⌛</span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Profile
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
