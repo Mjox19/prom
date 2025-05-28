@@ -25,15 +25,24 @@ export const AuthProvider = ({ children }) => {
           .insert([{
             id: user.id,
             email: user.email,
-            first_name: '',  // Required field, temporary value
-            last_name: '',   // Required field, temporary value
-            role: 'user'     // Default role as per schema
+            first_name: user.email.split('@')[0], // Set a default first name
+            last_name: '', // Required field, temporary value
+            role: 'user' // Default role as per schema
           }]);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          // If profile creation fails, sign out the user
+          await supabase.auth.signOut();
+          setUser(null);
+          return;
+        }
       }
     } catch (error) {
       console.error('Error ensuring profile exists:', error);
+      // If there's an error, sign out the user
+      await supabase.auth.signOut();
+      setUser(null);
     }
   };
 
@@ -55,6 +64,7 @@ export const AuthProvider = ({ children }) => {
       if (currentUser) {
         await ensureProfile(currentUser);
       }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
