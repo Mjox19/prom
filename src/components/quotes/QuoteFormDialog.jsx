@@ -13,7 +13,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   const [newQuote, setNewQuote] = useState({
     customerId: "",
     quoteNumber: "",
-    title: "",
     description: "",
     items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
     subtotal: 0,
@@ -57,7 +56,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       setNewQuote({
         customerId: "",
         quoteNumber: "",
-        title: "",
         description: "",
         items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
         subtotal: 0,
@@ -174,22 +172,12 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="title">Quote Title</Label>
-          <Input
-            id="title"
-            value={newQuote.title}
-            onChange={(e) => setNewQuote({...newQuote, title: e.target.value})}
-            placeholder="Enter quote title"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="description">Special Client Notes</Label>
           <Textarea
             id="description"
             value={newQuote.description}
             onChange={(e) => setNewQuote({...newQuote, description: e.target.value})}
-            placeholder="Enter quote description"
+            placeholder="Enter any special notes for this client"
           />
         </div>
 
@@ -234,7 +222,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
                 {newQuote.items.length > 1 && (
-                  <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
