@@ -37,20 +37,26 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from "@/lib/customerData";
-import { getQuotes } from "@/lib/quoteData";
-import { getSales } from "@/lib/saleData";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
   const [formData, setFormData] = useState({
-    name: "", email: "", phone: "", address: "", contactPerson: "", notes: ""
+    first_name: "", last_name: "", email: "", phone: "", address: "", bio: ""
   });
 
   useEffect(() => {
     if (customer) {
-      setFormData(customer);
+      setFormData({
+        first_name: customer.first_name || "",
+        last_name: customer.last_name || "",
+        email: customer.email || "",
+        phone: customer.phone || "",
+        address: customer.address || "",
+        bio: customer.bio || ""
+      });
     } else {
-      setFormData({ name: "", email: "", phone: "", address: "", contactPerson: "", notes: "" });
+      setFormData({ first_name: "", last_name: "", email: "", phone: "", address: "", bio: "" });
     }
   }, [customer, open]);
 
@@ -74,31 +80,64 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor={customer ? "edit-name" : "name"}>Company Name</Label>
-            <Input id={customer ? "edit-name" : "name"} value={formData.name} onChange={handleChange} placeholder="Enter company name" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={customer ? "edit-first_name" : "first_name"}>First Name</Label>
+              <Input 
+                id={customer ? "edit-first_name" : "first_name"} 
+                value={formData.first_name} 
+                onChange={handleChange} 
+                placeholder="Enter first name" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={customer ? "edit-last_name" : "last_name"}>Last Name</Label>
+              <Input 
+                id={customer ? "edit-last_name" : "last_name"} 
+                value={formData.last_name} 
+                onChange={handleChange} 
+                placeholder="Enter last name" 
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor={customer ? "edit-email" : "email"}>Email</Label>
-              <Input id={customer ? "edit-email" : "email"} type="email" value={formData.email} onChange={handleChange} placeholder="Enter email" />
+              <Input 
+                id={customer ? "edit-email" : "email"} 
+                type="email" 
+                value={formData.email} 
+                onChange={handleChange} 
+                placeholder="Enter email" 
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor={customer ? "edit-phone" : "phone"}>Phone</Label>
-              <Input id={customer ? "edit-phone" : "phone"} value={formData.phone} onChange={handleChange} placeholder="Enter phone number" />
+              <Input 
+                id={customer ? "edit-phone" : "phone"} 
+                value={formData.phone} 
+                onChange={handleChange} 
+                placeholder="Enter phone number" 
+              />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor={customer ? "edit-address" : "address"}>Address</Label>
-            <Input id={customer ? "edit-address" : "address"} value={formData.address} onChange={handleChange} placeholder="Enter address" />
+            <Input 
+              id={customer ? "edit-address" : "address"} 
+              value={formData.address} 
+              onChange={handleChange} 
+              placeholder="Enter address" 
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={customer ? "edit-contactPerson" : "contactPerson"}>Contact Person</Label>
-            <Input id={customer ? "edit-contactPerson" : "contactPerson"} value={formData.contactPerson} onChange={handleChange} placeholder="Enter contact person name" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor={customer ? "edit-notes" : "notes"}>Notes</Label>
-            <Textarea id={customer ? "edit-notes" : "notes"} value={formData.notes} onChange={handleChange} placeholder="Enter notes about this customer" />
+            <Label htmlFor={customer ? "edit-bio" : "bio"}>Bio</Label>
+            <Textarea 
+              id={customer ? "edit-bio" : "bio"} 
+              value={formData.bio} 
+              onChange={handleChange} 
+              placeholder="Enter notes about this customer" 
+            />
           </div>
         </div>
         <DialogFooter>
@@ -110,10 +149,8 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
   );
 };
 
-const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => {
+const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) => {
   if (!customer) return null;
-  const customerQuotes = quotes.filter(q => q.customerId === customer.id);
-  const customerSales = sales.filter(s => s.customerId === customer.id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,8 +162,8 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
               <User className="h-8 w-8 text-purple-600" />
             </div>
             <div>
-              <h3 className="text-xl font-bold">{customer.name}</h3>
-              <p className="text-gray-500">{customer.contactPerson}</p>
+              <h3 className="text-xl font-bold">{customer.full_name}</h3>
+              <p className="text-gray-500">{customer.email}</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
@@ -143,12 +180,12 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
                 </div>
               </div>
             ))}
-            {customer.notes && (
+            {customer.bio && (
               <div className="flex items-start space-x-3 col-span-2">
-                <div className="shrink-0 w-5 h-5"></div> {/* Spacer for alignment */}
+                <div className="shrink-0 w-5 h-5"></div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Notes</p>
-                  <p className="text-gray-700">{customer.notes}</p>
+                  <p className="text-sm font-medium text-gray-500">Bio</p>
+                  <p className="text-gray-700">{customer.bio}</p>
                 </div>
               </div>
             )}
@@ -157,8 +194,8 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
             <h4 className="text-lg font-medium mb-3">Activity</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { title: "Quotes", items: customerQuotes, Icon: FileText, color: "text-blue-500" },
-                { title: "Sales", items: customerSales, Icon: TrendingUp, color: "text-green-500" },
+                { title: "Quotes", items: quotes, Icon: FileText, color: "text-blue-500" },
+                { title: "Orders", items: orders, Icon: TrendingUp, color: "text-green-500" },
               ].map(activity => (
                 <div key={activity.title}>
                   <div className="flex items-center mb-2">
@@ -166,16 +203,18 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
                     <h5 className="font-medium">{activity.title}</h5>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
-                    {activity.items.length > 0 ? (
+                    {activity.items?.length > 0 ? (
                       <ul className="space-y-2">
                         {activity.items.map(item => (
                           <li key={item.id} className="text-sm flex justify-between">
-                            <span>{item.title}</span>
+                            <span>{item.title || `#${item.id.slice(0, 8)}`}</span>
                             <span className={`status-badge status-${item.status}`}>{item.status}</span>
                           </li>
                         ))}
                       </ul>
-                    ) : (<p className="text-sm text-gray-500">No {activity.title.toLowerCase()} yet</p>)}
+                    ) : (
+                      <p className="text-sm text-gray-500">No {activity.title.toLowerCase()} yet</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -188,9 +227,9 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, sales }) => 
 };
 
 const Customers = () => {
-  const [customers, setCustomersState] = useState([]);
-  const [quotes, setQuotesState] = useState([]);
-  const [sales, setSalesState] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -198,39 +237,138 @@ const Customers = () => {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  useEffect(() => { loadData(); }, []);
-
-  const loadData = () => {
-    setCustomersState(getCustomers());
-    setQuotesState(getQuotes());
-    setSalesState(getSales());
-  };
-
-  const handleCreateSubmit = (formData) => {
-    addCustomer(formData);
-    loadData();
-    setIsCreateDialogOpen(false);
-    toast({ title: "Customer created", description: "The customer has been successfully created." });
-  };
-
-  const handleEditSubmit = (formData) => {
-    if (selectedCustomer) {
-      updateCustomer(selectedCustomer.id, formData);
+  useEffect(() => {
+    if (user) {
       loadData();
-      setIsEditDialogOpen(false);
-      setSelectedCustomer(null);
-      toast({ title: "Customer updated", description: "The customer has been successfully updated." });
+    }
+  }, [user]);
+
+  const loadData = async () => {
+    try {
+      // Get profiles (customers)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (profilesError) throw profilesError;
+
+      // Get quotes
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', user.id);
+
+      if (quotesError) throw quotesError;
+
+      // Get orders
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', user.id);
+
+      if (ordersError) throw ordersError;
+
+      setCustomers(profiles || []);
+      setQuotes(quotesData || []);
+      setOrders(ordersData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load customer data",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleDeleteCustomer = () => {
-    if (selectedCustomer) {
-      deleteCustomer(selectedCustomer.id);
+  const handleCreateSubmit = async (formData) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([{
+          ...formData,
+          role: 'user'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
       loadData();
-      setIsDeleteDialogOpen(false);
-      setSelectedCustomer(null);
-      toast({ title: "Customer deleted", description: "The customer has been successfully deleted.", variant: "destructive" });
+      setIsCreateDialogOpen(false);
+      toast({ 
+        title: "Customer Created", 
+        description: "The customer has been successfully created." 
+      });
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create customer. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditSubmit = async (formData) => {
+    if (selectedCustomer) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedCustomer.id);
+
+        if (error) throw error;
+
+        loadData();
+        setIsEditDialogOpen(false);
+        setSelectedCustomer(null);
+        toast({ 
+          title: "Customer Updated", 
+          description: "The customer has been successfully updated." 
+        });
+      } catch (error) {
+        console.error('Error updating customer:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update customer. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (selectedCustomer) {
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', selectedCustomer.id);
+
+        if (error) throw error;
+
+        loadData();
+        setIsDeleteDialogOpen(false);
+        setSelectedCustomer(null);
+        toast({ 
+          title: "Customer Deleted", 
+          description: "The customer has been successfully deleted.", 
+          variant: "destructive" 
+        });
+      } catch (error) {
+        console.error('Error deleting customer:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete customer. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
   
@@ -279,9 +417,9 @@ const Customers = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
-                      <TableHead>Contact</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
+                      <TableHead>Address</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -290,26 +428,48 @@ const Customers = () => {
                       filteredCustomers.map((customer) => (
                         <motion.tr key={customer.id} variants={itemVariants} className="border-b transition-colors hover:bg-gray-50">
                           <TableCell className="font-medium">
-                            <div className="flex items-center"><User className="h-4 w-4 text-purple-500 mr-2" />{customer.name}</div>
+                            <div className="flex items-center">
+                              <User className="h-4 w-4 text-purple-500 mr-2" />
+                              {customer.full_name}
+                            </div>
                           </TableCell>
-                          <TableCell>{customer.contactPerson}</TableCell>
                           <TableCell>
-                            <div className="flex items-center"><Mail className="h-4 w-4 text-gray-400 mr-2" />{customer.email}</div>
+                            <div className="flex items-center">
+                              <Mail className="h-4 w-4 text-gray-400 mr-2" />
+                              {customer.email}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center"><Phone className="h-4 w-4 text-gray-400 mr-2" />{customer.phone}</div>
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 text-gray-400 mr-2" />
+                              {customer.phone}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                              {customer.address}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
-                              <Button variant="ghost" size="icon" onClick={() => openViewDialog(customer)} title="View Customer"><Users className="h-4 w-4 text-blue-500" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(customer)} title="Edit Customer"><Edit className="h-4 w-4 text-amber-500" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => { setSelectedCustomer(customer); setIsDeleteDialogOpen(true);}} title="Delete Customer"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => openViewDialog(customer)} title="View Customer">
+                                <Users className="h-4 w-4 text-blue-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(customer)} title="Edit Customer">
+                                <Edit className="h-4 w-4 text-amber-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => { setSelectedCustomer(customer); setIsDeleteDialogOpen(true);}} title="Delete Customer">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
                             </div>
                           </TableCell>
                         </motion.tr>
                       ))
                     ) : (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">No customers found.</TableCell></TableRow>
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">No customers found.</TableCell>
+                      </TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -319,9 +479,24 @@ const Customers = () => {
         </div>
       </div>
       
-      <CustomerFormDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onSubmit={handleCreateSubmit} />
-      <CustomerFormDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} customer={selectedCustomer} onSubmit={handleEditSubmit} />
-      <CustomerViewDialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} customer={selectedCustomer} quotes={quotes} sales={sales} />
+      <CustomerFormDialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={setIsCreateDialogOpen} 
+        onSubmit={handleCreateSubmit} 
+      />
+      <CustomerFormDialog 
+        open={isEditDialogOpen} 
+        onOpenChange={setIsEditDialogOpen} 
+        customer={selectedCustomer} 
+        onSubmit={handleEditSubmit} 
+      />
+      <CustomerViewDialog 
+        open={isViewDialogOpen} 
+        onOpenChange={setIsViewDialogOpen} 
+        customer={selectedCustomer} 
+        quotes={quotes.filter(q => q.customer_id === selectedCustomer?.id)} 
+        orders={orders.filter(o => o.customer_id === selectedCustomer?.id)} 
+      />
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
