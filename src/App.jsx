@@ -19,7 +19,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+          <Route element={<AuthGuard><Layout /></AuthGuard>}>
             <Route index element={<Dashboard />} />
             <Route path="quotes" element={<Quotes />} />
             <Route path="sales" element={<Sales />} />
@@ -28,7 +28,7 @@ function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="settings" element={<Settings />} />
           </Route>
-          <Route path="*" element={<Navigate to="/\" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />
       </Router>
