@@ -8,11 +8,18 @@ import { useAuth } from "@/contexts/AuthContext";
 const Header = ({ title }) => {
   const { user } = useAuth();
   
-  // Get user's email and create initials from it
-  const email = user?.email || '';
-  const initials = email
-    .split('@')[0]
-    .split('.')
+  // Get user's name from email (before @) and capitalize first letters
+  const displayName = user?.email 
+    ? user.email
+        .split('@')[0]
+        .split('.')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
+    : 'User';
+
+  // Create initials from the display name
+  const initials = displayName
+    .split(' ')
     .map(part => part[0])
     .join('')
     .toUpperCase()
@@ -43,7 +50,7 @@ const Header = ({ title }) => {
             </AvatarFallback>
           </Avatar>
           <div className="text-sm">
-            <p className="font-medium text-gray-700">{email}</p>
+            <p className="font-medium text-gray-700">{displayName}</p>
           </div>
         </div>
       </div>

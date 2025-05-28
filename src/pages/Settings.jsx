@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const settingsSections = [
   { id: "profile", label: "Profile", icon: User, description: "Update your personal information." },
@@ -35,8 +36,25 @@ const settingsSections = [
 
 const Settings = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activeSection, setActiveSection] = React.useState("profile");
   
+  // Get display name from email
+  const displayName = user?.email 
+    ? user.email
+        .split('@')[0]
+        .split('.')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
+    : '';
+
+  const [formData, setFormData] = React.useState({
+    firstName: displayName.split(' ')[0] || '',
+    lastName: displayName.split(' ')[1] || '',
+    email: user?.email || '',
+    bio: "Dedicated sales professional managing quotes and deals."
+  });
+
   const handleSave = (sectionName) => {
     toast({
       title: "Settings Saved",
@@ -76,20 +94,38 @@ const Settings = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="Admin" />
+                  <Input 
+                    id="firstName" 
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="User" />
+                  <Input 
+                    id="lastName" 
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                  />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue="admin@example.com" />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  value={formData.email}
+                  disabled
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="bio">Bio</Label>
-                <Textarea id="bio" placeholder="Tell us a little about yourself" defaultValue="Dedicated sales professional managing quotes and deals." />
+                <Textarea 
+                  id="bio" 
+                  value={formData.bio}
+                  onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                  placeholder="Tell us a little about yourself" 
+                />
               </div>
               <Button onClick={() => handleSave("Profile")} className="mt-4 bg-indigo-600 hover:bg-indigo-700">
                 <Save className="h-4 w-4 mr-2" />
