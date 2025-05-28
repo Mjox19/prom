@@ -31,11 +31,13 @@ const Quotes = () => {
 
   const loadPageData = async () => {
     try {
-      // Get quotes
+      // Get quotes that belong to customers where the user is authorized
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
-        .select('*')
-        .eq('customer_id', user.id);
+        .select(`
+          *,
+          customer:customers(*)
+        `);
 
       if (quotesError) throw quotesError;
 
@@ -60,6 +62,15 @@ const Quotes = () => {
 
   const handleFormSubmit = async (quoteData) => {
     try {
+      // Verify that the customer exists and user has access
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', quoteData.customerId)
+        .single();
+
+      if (customerError) throw new Error('Invalid customer selected');
+
       if (editingQuote) {
         const { error } = await supabase
           .from('quotes')
@@ -91,7 +102,8 @@ const Quotes = () => {
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
             total: quoteData.total,
-            valid_until: quoteData.validUntil
+            valid_until: quoteData.validUntil,
+            status: 'draft' // Explicitly set initial status
           }]);
 
         if (error) throw error;
@@ -109,7 +121,7 @@ const Quotes = () => {
       console.error('Error saving quote:', error);
       toast({
         title: "Error",
-        description: "Failed to save quote. Please try again.",
+        description: error.message || "Failed to save quote. Please try again.",
         variant: "destructive"
       });
     }
@@ -176,13 +188,22 @@ const Quotes = () => {
       const quote = quotes.find(q => q.id === quoteId);
       if (!quote) throw new Error('Quote not found');
 
+      // Get customer details to get the shipping address
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('address')
+        .eq('id', quote.customer_id)
+        .single();
+
+      if (customerError) throw customerError;
+
       const { error } = await supabase
         .from('orders')
         .insert([{
           customer_id: quote.customer_id,
           status: 'pending',
           total_amount: quote.total,
-          shipping_address: 'TBD' // Required field
+          shipping_address: customer.address || 'Address pending'
         }]);
 
       if (error) throw error;
