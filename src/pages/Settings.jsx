@@ -13,7 +13,8 @@ import {
   BellRing,
   ShieldCheck,
   DollarSign,
-  Headphones
+  Headphones,
+  Copy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -202,6 +203,14 @@ const Settings = () => {
     setNotificationPrefs(prev => ({ ...prev, [key]: value }));
   };
 
+  const copyUserId = () => {
+    navigator.clipboard.writeText(user.id);
+    toast({
+      title: "User ID Copied",
+      description: "Your user ID has been copied to clipboard.",
+    });
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -257,6 +266,24 @@ const Settings = () => {
                   value={formData.email}
                   disabled
                 />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="userId">User ID</Label>
+                <div className="flex space-x-2">
+                  <Input 
+                    id="userId" 
+                    value={user.id}
+                    disabled
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={copyUserId}
+                    title="Copy User ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="bio">Bio</Label>
