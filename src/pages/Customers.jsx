@@ -11,7 +11,10 @@ import {
   Edit,
   User,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Building,
+  Globe,
+  Languages
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,7 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
@@ -42,21 +46,42 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
   const [formData, setFormData] = useState({
-    first_name: "", last_name: "", email: "", phone: "", address: "", bio: ""
+    company_name: "",
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    country: "",
+    address: "",
+    contact_language: "english",
+    bio: ""
   });
 
   useEffect(() => {
     if (customer) {
       setFormData({
+        company_name: customer.company_name || "",
         first_name: customer.first_name || "",
         last_name: customer.last_name || "",
         email: customer.email || "",
         phone: customer.phone || "",
+        country: customer.country || "",
         address: customer.address || "",
+        contact_language: customer.contact_language || "english",
         bio: customer.bio || ""
       });
     } else {
-      setFormData({ first_name: "", last_name: "", email: "", phone: "", address: "", bio: "" });
+      setFormData({
+        company_name: "",
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        country: "",
+        address: "",
+        contact_language: "english",
+        bio: ""
+      });
     }
   }, [customer, open]);
 
@@ -64,15 +89,26 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id.replace("edit-", "")]: value }));
   };
+
+  const handleSelectChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
   
   const handleSubmit = () => {
     onSubmit(formData);
     if (resetForm) resetForm();
   };
 
+  const languages = [
+    { value: "english", label: "English" },
+    { value: "french", label: "French" },
+    { value: "spanish", label: "Spanish" },
+    { value: "dutch", label: "Dutch" }
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{customer ? "Edit Customer" : "Add New Customer"}</DialogTitle>
           <DialogDescription>
@@ -80,63 +116,106 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor={customer ? "edit-company_name" : "company_name"}>Company Name</Label>
+            <Input
+              id={customer ? "edit-company_name" : "company_name"}
+              value={formData.company_name}
+              onChange={handleChange}
+              placeholder="Enter company name"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor={customer ? "edit-first_name" : "first_name"}>First Name</Label>
-              <Input 
-                id={customer ? "edit-first_name" : "first_name"} 
-                value={formData.first_name} 
-                onChange={handleChange} 
-                placeholder="Enter first name" 
+              <Label htmlFor={customer ? "edit-first_name" : "first_name"}>Contact Person First Name</Label>
+              <Input
+                id={customer ? "edit-first_name" : "first_name"}
+                value={formData.first_name}
+                onChange={handleChange}
+                placeholder="Enter first name"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={customer ? "edit-last_name" : "last_name"}>Last Name</Label>
-              <Input 
-                id={customer ? "edit-last_name" : "last_name"} 
-                value={formData.last_name} 
-                onChange={handleChange} 
-                placeholder="Enter last name" 
+              <Label htmlFor={customer ? "edit-last_name" : "last_name"}>Contact Person Last Name</Label>
+              <Input
+                id={customer ? "edit-last_name" : "last_name"}
+                value={formData.last_name}
+                onChange={handleChange}
+                placeholder="Enter last name"
               />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor={customer ? "edit-email" : "email"}>Email</Label>
-              <Input 
-                id={customer ? "edit-email" : "email"} 
-                type="email" 
-                value={formData.email} 
-                onChange={handleChange} 
-                placeholder="Enter email" 
+              <Input
+                id={customer ? "edit-email" : "email"}
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter email"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor={customer ? "edit-phone" : "phone"}>Phone</Label>
-              <Input 
-                id={customer ? "edit-phone" : "phone"} 
-                value={formData.phone} 
-                onChange={handleChange} 
-                placeholder="Enter phone number" 
+              <Input
+                id={customer ? "edit-phone" : "phone"}
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
               />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={customer ? "edit-country" : "country"}>Country</Label>
+              <Input
+                id={customer ? "edit-country" : "country"}
+                value={formData.country}
+                onChange={handleChange}
+                placeholder="Enter country"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact Language</Label>
+              <Select
+                value={formData.contact_language}
+                onValueChange={(value) => handleSelectChange("contact_language", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map(lang => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor={customer ? "edit-address" : "address"}>Address</Label>
-            <Input 
-              id={customer ? "edit-address" : "address"} 
-              value={formData.address} 
-              onChange={handleChange} 
-              placeholder="Enter address" 
+            <Input
+              id={customer ? "edit-address" : "address"}
+              value={formData.address}
+              onChange={handleChange}
+              placeholder="Enter complete address"
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor={customer ? "edit-bio" : "bio"}>Bio</Label>
-            <Textarea 
-              id={customer ? "edit-bio" : "bio"} 
-              value={formData.bio} 
-              onChange={handleChange} 
-              placeholder="Enter notes about this customer" 
+            <Label htmlFor={customer ? "edit-bio" : "bio"}>Notes</Label>
+            <Textarea
+              id={customer ? "edit-bio" : "bio"}
+              value={formData.bio}
+              onChange={handleChange}
+              placeholder="Enter additional notes about this customer"
             />
           </div>
         </div>
@@ -168,6 +247,9 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) =>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             {[
+              { icon: Building, label: "Company", value: customer.company_name },
+              { icon: Globe, label: "Country", value: customer.country },
+              { icon: Languages, label: "Contact Language", value: customer.contact_language },
               { icon: Mail, label: "Email", value: customer.email },
               { icon: Phone, label: "Phone", value: customer.phone },
               { icon: MapPin, label: "Address", value: customer.address, span: true },
@@ -184,7 +266,7 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) =>
               <div className="flex items-start space-x-3 col-span-2">
                 <div className="shrink-0 w-5 h-5"></div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Bio</p>
+                  <p className="text-sm font-medium text-gray-500">Notes</p>
                   <p className="text-gray-700">{customer.bio}</p>
                 </div>
               </div>
@@ -417,9 +499,10 @@ const Customers = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
+                      <TableHead>Company</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
-                      <TableHead>Address</TableHead>
+                      <TableHead>Country</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -431,6 +514,12 @@ const Customers = () => {
                             <div className="flex items-center">
                               <User className="h-4 w-4 text-purple-500 mr-2" />
                               {customer.full_name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <Building className="h-4 w-4 text-gray-400 mr-2" />
+                              {customer.company_name}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -447,8 +536,8 @@ const Customers = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center">
-                              <MapPin className="h-4 w-4 text-gray-400 mr-2" />
-                              {customer.address}
+                              <Globe className="h-4 w-4 text-gray-400 mr-2" />
+                              {customer.country}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -468,7 +557,7 @@ const Customers = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-gray-500">No customers found.</TableCell>
+                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">No customers found.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
