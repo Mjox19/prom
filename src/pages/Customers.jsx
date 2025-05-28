@@ -14,7 +14,8 @@ import {
   TrendingUp,
   Building,
   Globe,
-  Languages
+  Languages,
+  UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,8 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
     phone: "",
     country: "",
     address: "",
-    contact_language: "",
+    contact_language: "english",
+    customer_type: "end_client",
     bio: ""
   });
 
@@ -67,7 +69,8 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
         phone: customer.phone || "",
         country: customer.country || "",
         address: customer.address || "",
-        contact_language: customer.contact_language || "",
+        contact_language: customer.contact_language || "english",
+        customer_type: customer.customer_type || "end_client",
         bio: customer.bio || ""
       });
     } else {
@@ -79,7 +82,8 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
         phone: "",
         country: "",
         address: "",
-        contact_language: "",
+        contact_language: "english",
+        customer_type: "end_client",
         bio: ""
       });
     }
@@ -99,6 +103,18 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
     if (resetForm) resetForm();
   };
 
+  const languages = [
+    { value: "english", label: "English" },
+    { value: "french", label: "French" },
+    { value: "spanish", label: "Spanish" },
+    { value: "dutch", label: "Dutch" }
+  ];
+
+  const customerTypes = [
+    { value: "reseller", label: "Reseller" },
+    { value: "end_client", label: "End Client" }
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -109,19 +125,39 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor={customer ? "edit-company_name" : "company_name"}>Company Name</Label>
-            <Input
-              id={customer ? "edit-company_name" : "company_name"}
-              value={formData.company_name}
-              onChange={handleChange}
-              placeholder="Enter company name"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={customer ? "edit-company_name" : "company_name"}>Company Name</Label>
+              <Input
+                id={customer ? "edit-company_name" : "company_name"}
+                value={formData.company_name}
+                onChange={handleChange}
+                placeholder="Enter company name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Customer Type</Label>
+              <Select
+                value={formData.customer_type}
+                onValueChange={(value) => handleSelectChange("customer_type", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customerTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor={customer ? "edit-first_name" : "first_name"}>Contact First Name</Label>
+              <Label htmlFor={customer ? "edit-first_name" : "first_name"}>Contact Person First Name</Label>
               <Input
                 id={customer ? "edit-first_name" : "first_name"}
                 value={formData.first_name}
@@ -130,7 +166,7 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={customer ? "edit-last_name" : "last_name"}>Contact Last Name</Label>
+              <Label htmlFor={customer ? "edit-last_name" : "last_name"}>Contact Person Last Name</Label>
               <Input
                 id={customer ? "edit-last_name" : "last_name"}
                 value={formData.last_name}
@@ -164,7 +200,7 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor={customer ? "edit-country" : "country"}>Country</Label>
               <Input
                 id={customer ? "edit-country" : "country"}
                 value={formData.country}
@@ -173,7 +209,7 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact_language">Contact Language</Label>
+              <Label>Contact Language</Label>
               <Select
                 value={formData.contact_language}
                 onValueChange={(value) => handleSelectChange("contact_language", value)}
@@ -182,10 +218,11 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="english">English</SelectItem>
-                  <SelectItem value="french">French</SelectItem>
-                  <SelectItem value="spanish">Spanish</SelectItem>
-                  <SelectItem value="dutch">Dutch</SelectItem>
+                  {languages.map(lang => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      {lang.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -197,7 +234,7 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
               id={customer ? "edit-address" : "address"}
               value={formData.address}
               onChange={handleChange}
-              placeholder="Enter address"
+              placeholder="Enter complete address"
             />
           </div>
 
@@ -207,7 +244,7 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
               id={customer ? "edit-bio" : "bio"}
               value={formData.bio}
               onChange={handleChange}
-              placeholder="Enter notes about this customer"
+              placeholder="Enter additional notes about this customer"
             />
           </div>
         </div>
