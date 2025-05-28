@@ -11,13 +11,13 @@ import { getProducts, getProductPriceForQuantity } from "@/lib/productData";
 const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [newQuote, setNewQuote] = useState({
-    customerId: "", 
-    title: "", 
+    customerId: "",
+    title: "",
     description: "",
     items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-    subtotal: 0, 
-    tax: 0, 
-    total: 0, 
+    subtotal: 0,
+    tax: 0,
+    total: 0,
     validUntil: "",
     expectedDeliveryDate: ""
   });
@@ -35,67 +35,73 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         price: item.price || 0,
         manualPrice: item.manualPrice || false,
       })) || [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }];
+
       setNewQuote({ ...quoteToEdit, items });
     } else {
       // Set default dates for new quotes
       const today = new Date();
+      
+      // Valid until - 30 days from today
       const validUntil = new Date(today);
-      validUntil.setDate(validUntil.getDate() + 30); // Valid for 30 days
-
+      validUntil.setDate(validUntil.getDate() + 30);
+      
+      // Expected delivery - 15 days from today
       const expectedDelivery = new Date(today);
-      expectedDelivery.setDate(expectedDelivery.getDate() + 15); // Delivery in 15 days
+      expectedDelivery.setDate(expectedDelivery.getDate() + 15);
 
-      resetNewQuote(validUntil.toISOString().split('T')[0], expectedDelivery.toISOString().split('T')[0]);
+      setNewQuote({
+        customerId: "",
+        title: "",
+        description: "",
+        items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
+        subtotal: 0,
+        tax: 0,
+        total: 0,
+        validUntil: validUntil.toISOString().split('T')[0],
+        expectedDeliveryDate: expectedDelivery.toISOString().split('T')[0]
+      });
     }
   }, [quoteToEdit]);
-
-  const resetNewQuote = (validUntil, expectedDeliveryDate) => {
-    setNewQuote({
-      customerId: "", 
-      title: "", 
-      description: "",
-      items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-      subtotal: 0, 
-      tax: 0, 
-      total: 0, 
-      validUntil,
-      expectedDeliveryDate
-    });
-  };
 
   const handleItemChange = (index, field, value) => {
     const updatedItems = [...newQuote.items];
     const currentItem = updatedItems[index];
     
     if (field === "productId") {
-        const product = allProducts.find(p => p.id === value);
-        currentItem.productId = value;
-        currentItem.description = product ? product.name : "";
-        if (!currentItem.manualPrice && product) {
-          currentItem.price = getProductPriceForQuantity(product, currentItem.quantity);
-        }
+      const product = allProducts.find(p => p.id === value);
+      currentItem.productId = value;
+      currentItem.description = product ? product.name : "";
+      if (!currentItem.manualPrice && product) {
+        currentItem.price = getProductPriceForQuantity(product, currentItem.quantity);
+      }
     } else if (field === "quantity") {
-        const newQuantity = parseInt(value) || 0;
-        currentItem.quantity = newQuantity;
-        const product = allProducts.find(p => p.id === currentItem.productId);
-        if (newQuantity > 10000) {
-            currentItem.manualPrice = true; 
-        } else {
-          currentItem.manualPrice = false;
-          if (product) {
-            currentItem.price = getProductPriceForQuantity(product, newQuantity);
-          }
+      const newQuantity = parseInt(value) || 0;
+      currentItem.quantity = newQuantity;
+      const product = allProducts.find(p => p.id === currentItem.productId);
+      if (newQuantity > 10000) {
+        currentItem.manualPrice = true;
+      } else {
+        currentItem.manualPrice = false;
+        if (product) {
+          currentItem.price = getProductPriceForQuantity(product, newQuantity);
         }
+      }
     } else if (field === "price") {
-        currentItem.price = parseFloat(value) || 0;
+      currentItem.price = parseFloat(value) || 0;
     } else {
-        currentItem[field] = value;
+      currentItem[field] = value;
     }
     
     setNewQuote(prev => ({ ...prev, items: updatedItems }));
   };
   
-  const handleAddItem = () => setNewQuote(prev => ({ ...prev, items: [...prev.items, { productId: "", description: "", quantity: 1, price: 0, manualPrice: false }]}));
+  const handleAddItem = () => {
+    setNewQuote(prev => ({
+      ...prev,
+      items: [...prev.items, { productId: "", description: "", quantity: 1, price: 0, manualPrice: false }]
+    }));
+  };
+
   const handleRemoveItem = (index) => {
     const updatedItems = newQuote.items.filter((_, i) => i !== index);
     setNewQuote(prev => ({ ...prev, items: updatedItems }));
@@ -103,7 +109,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
 
   const calculateTotals = (items) => {
     const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-    const tax = subtotal * 0.08; 
+    const tax = subtotal * 0.08;
     const total = subtotal + tax;
     return { subtotal, tax, total };
   };
@@ -140,36 +146,48 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
           </div>
           <div className="space-y-2">
             <Label htmlFor="validUntil">Valid Until</Label>
-            <Input 
-              id="validUntil" 
-              type="date" 
-              value={newQuote.validUntil} 
-              onChange={(e) => setNewQuote({...newQuote, validUntil: e.target.value})} 
+            <Input
+              id="validUntil"
+              type="date"
+              value={newQuote.validUntil}
+              onChange={(e) => setNewQuote({...newQuote, validUntil: e.target.value})}
             />
           </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="title">Quote Title</Label>
-          <Input id="title" value={newQuote.title} onChange={(e) => setNewQuote({...newQuote, title: e.target.value})} placeholder="Enter quote title" />
+          <Input
+            id="title"
+            value={newQuote.title}
+            onChange={(e) => setNewQuote({...newQuote, title: e.target.value})}
+            placeholder="Enter quote title"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="description">Description</Label>
-          <Textarea id="description" value={newQuote.description} onChange={(e) => setNewQuote({...newQuote, description: e.target.value})} placeholder="Enter quote description" />
+          <Textarea
+            id="description"
+            value={newQuote.description}
+            onChange={(e) => setNewQuote({...newQuote, description: e.target.value})}
+            placeholder="Enter quote description"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
-          <Input 
-            id="expectedDeliveryDate" 
-            type="date" 
-            value={newQuote.expectedDeliveryDate} 
-            onChange={(e) => setNewQuote({...newQuote, expectedDeliveryDate: e.target.value})} 
+          <Input
+            id="expectedDeliveryDate"
+            type="date"
+            value={newQuote.expectedDeliveryDate}
+            onChange={(e) => setNewQuote({...newQuote, expectedDeliveryDate: e.target.value})}
           />
         </div>
         
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <Label>Items</Label>
-            <Button type="button" variant="outline" size="sm" onClick={handleAddItem}><Plus className="h-4 w-4 mr-1" />Add Item</Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
+              <Plus className="h-4 w-4 mr-1" />Add Item
+            </Button>
           </div>
           {newQuote.items.map((item, index) => (
             <div key={index} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
@@ -194,11 +212,15 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               </div>
               <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
               <div className="col-span-1 flex justify-end">
-                {newQuote.items.length > 1 && <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}><Trash2 className="h-4 w-4 text-red-500" /></Button>}
-              </div>
-               {item.manualPrice && item.quantity > 10000 && (
-                  <div className="col-span-12 text-xs text-amber-600">Manual price entry enabled for quantity over 10,000.</div>
+                {newQuote.items.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
                 )}
+              </div>
+              {item.manualPrice && item.quantity > 10000 && (
+                <div className="col-span-12 text-xs text-amber-600">Manual price entry enabled for quantity over 10,000.</div>
+              )}
             </div>
           ))}
           <div className="border-t pt-4 space-y-2">
