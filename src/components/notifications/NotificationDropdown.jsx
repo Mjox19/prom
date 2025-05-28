@@ -13,20 +13,45 @@ const NotificationDropdown = () => {
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      // Subscribe to new notifications
+      
+      // Subscribe to all notification changes
       const channel = supabase
-        .channel('notifications')
+        .channel('notification-changes')
         .on(
           'postgres_changes',
           {
-            event: 'INSERT',
+            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
             schema: 'public',
             table: 'notifications',
             filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
-            setNotifications(prev => [payload.new, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            if (payload.eventType === 'INSERT') {
+              setNotifications(prev => [payload.new, ...prev]);
+              if (!payload.new.read) {
+                setUnreadCount(prev => prev + 1);
+                // Show browser notification if enabled
+                if (Notification.permission === 'granted') {
+                  new Notification(payload.new.title, {
+                    body: payload.new.message,
+                    icon: '/vite.svg'
+                  });
+                }
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              setNotifications(prev =>
+                prev.map(n => n.id === payload.new.id ? payload.new : n)
+              );
+              // Update unread count if read status changed
+              if (payload.old.read !== payload.new.read) {
+                setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+              if (!payload.old.read) {
+                setUnreadCount(prev => Math.max(0, prev - 1));
+              }
+            }
           }
         )
         .subscribe();
@@ -64,10 +89,7 @@ const NotificationDropdown = () => {
 
       if (error) throw error;
 
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      // No need to manually update state as it will be handled by the subscription
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -100,8 +122,20 @@ const NotificationDropdown = () => {
     return 'Just now';
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isOpen && !event.target.closest('.notification-dropdown')) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
   return (
-    <div className="relative">
+    <div className="relative notification-dropdown">
       <Button
         variant="ghost"
         size="icon"
