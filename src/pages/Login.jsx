@@ -131,67 +131,83 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-blue-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md glass-card">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Welcome to QuoteSales Pro</CardTitle>
-          <CardDescription>Sign in to your account or create a new one</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                disabled={loading}
-              />
-              <Button
-                type="button"
-                variant="link"
-                className="px-0 text-sm text-indigo-600 hover:text-indigo-800"
-                onClick={handlePasswordReset}
-                disabled={loading}
-              >
-                Forgot password?
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <Button
-            className="w-full bg-indigo-600 hover:bg-indigo-700"
-            onClick={handleLogin}
-            disabled={loading}
-          >
-            {loading ? "Please wait..." : "Sign In"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleSignUp}
-            disabled={loading}
-          >
-            Create Account
-          </Button>
-        </CardFooter>
-      </Card>
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">QuoteSales Pro</h1>
+          <p className="text-blue-200">Your complete sales management solution</p>
+        </div>
+        
+        <Card className="w-full glass-card">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold">Welcome Back</CardTitle>
+            <CardDescription>Sign in to your account or create a new one</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  disabled={loading}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  disabled={loading}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                />
+                <Button
+                  type="button"
+                  variant="link"
+                  className="px-0 text-sm text-blue-200 hover:text-blue-100"
+                  onClick={handlePasswordReset}
+                  disabled={loading}
+                >
+                  Forgot password?
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-2">
+            <Button
+              className="w-full bg-white text-indigo-900 hover:bg-white/90"
+              onClick={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-900 mr-2"></div>
+                  Please wait...
+                </div>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-white/20 text-white hover:bg-white/10"
+              onClick={handleSignUp}
+              disabled={loading}
+            >
+              Create Account
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 };
