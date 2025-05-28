@@ -12,8 +12,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
-import { getDashboardStats, seedData } from "@/lib/data";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statCards = [
   {
@@ -50,25 +51,68 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
 
-  const loadDashboardData = () => {
-    setLoading(true);
-    setStats(getDashboardStats());
-    setLoading(false);
-  };
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
 
+      // Get quotes
+      const { data: quotes, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('customer_id', user.id);
 
-  const handleSeedData = () => {
-    seedData();
-    loadDashboardData();
-    toast({
-      title: "Sample data added",
-      description: "Sample data has been successfully added to the system.",
-    });
+      if (quotesError) throw quotesError;
+
+      // Get orders (sales)
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', user.id);
+
+      if (ordersError) throw ordersError;
+
+      // Get profiles (customers)
+      const { data: customers, error: customersError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (customersError) throw customersError;
+
+      const dashboardStats = {
+        totalQuotes: quotes?.length || 0,
+        totalSales: orders?.length || 0,
+        totalCustomers: customers?.length || 0,
+        pendingQuotes: quotes?.filter(q => q.status === 'sent').length || 0,
+        acceptedQuotes: quotes?.filter(q => q.status === 'accepted').length || 0,
+        declinedQuotes: quotes?.filter(q => q.status === 'declined').length || 0,
+        wonSales: orders?.filter(s => s.status === 'delivered').length || 0,
+        lostSales: orders?.filter(s => s.status === 'cancelled').length || 0,
+        activeSales: orders?.filter(s => !['delivered', 'cancelled'].includes(s.status)).length || 0,
+        totalQuoteValue: quotes?.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0) || 0,
+        totalSalesValue: orders?.reduce((sum, s) => sum + (parseFloat(s.total_amount) || 0), 0) || 0,
+        recentQuotes: quotes?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5) || [],
+        recentSales: orders?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5) || []
+      };
+
+      setStats(dashboardStats);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -114,7 +158,7 @@ const Dashboard = () => {
         <div>
           <p className="font-medium text-sm">{item.title}</p>
           <p className="text-xs text-gray-500">
-            ${(type === 'quote' ? item.total : item.amount)?.toLocaleString()}
+            ${(type === 'quote' ? item.total : item.total_amount)?.toLocaleString()}
           </p>
         </div>
       </div>
@@ -124,12 +168,11 @@ const Dashboard = () => {
         </span>
         <Calendar className="h-4 w-4 text-gray-400 ml-3" />
         <span className="text-xs text-gray-500 ml-1">
-          {new Date(item.createdAt).toLocaleDateString()}
+          {new Date(item.created_at).toLocaleDateString()}
         </span>
       </div>
     </div>
   );
-
 
   return (
     <div className="h-full flex flex-col">
@@ -142,12 +185,9 @@ const Dashboard = () => {
               <BarChart3 className="h-16 w-16 text-indigo-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to QuoteSales Pro</h1>
               <p className="text-gray-600 max-w-md">
-                Your comprehensive solution for managing quotes and sales. Get started by adding your first customer, quote, or sale.
+                Your comprehensive solution for managing quotes and sales. Get started by creating your first quote or sale.
               </p>
             </div>
-            <Button onClick={handleSeedData} className="bg-indigo-600 hover:bg-indigo-700">
-              Add Sample Data
-            </Button>
           </div>
         ) : (
           <motion.div
@@ -172,12 +212,6 @@ const Dashboard = () => {
                       <div className="text-2xl font-bold">
                         {card.formatter(stats[card.statKey] || 0)}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        <span className="text-green-500 flex items-center">
-                          <ArrowUpRight className="h-3 w-3 mr-1" />
-                          12% from last month
-                        </span>
-                      </p>
                     </CardContent>
                   </Card>
                 </motion.div>
