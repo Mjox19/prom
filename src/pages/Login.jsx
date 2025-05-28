@@ -40,27 +40,36 @@ const Login = () => {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
       });
 
       if (error) throw error;
       
       toast({
         title: "Success",
-        description: "Check your email for the confirmation link.",
+        description: "Account created successfully. You can now sign in.",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message === "User already registered" 
+          ? "An account with this email already exists. Please sign in instead."
+          : "Failed to create account. Please try again.",
         variant: "destructive"
       });
     } finally {
