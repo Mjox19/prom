@@ -93,11 +93,21 @@ const Login = () => {
       });
     } catch (error) {
       console.error('Signup error:', error);
-      toast({
-        title: "Signup Failed",
-        description: error.message || "Failed to create account. Please try again.",
-        variant: "destructive"
-      });
+      
+      // Check for the specific "User already registered" error
+      if (error.message === 'User already registered') {
+        toast({
+          title: "Account Exists",
+          description: "This email is already registered. Please sign in instead, or use a different email address.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: error.message || "Failed to create account. Please try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setLoading(false);
     }
