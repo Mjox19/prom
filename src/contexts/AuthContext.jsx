@@ -25,8 +25,10 @@ export const AuthProvider = ({ children }) => {
           .insert([{
             id: user.id,
             email: user.email,
-            first_name: user.email.split('@')[0], // Set a default first name
-            last_name: '', // Required field, temporary value
+            first_name: user.email.split('@')[0], // Default first name from email
+            last_name: '', // Empty last name
+            avatar_url: null,
+            bio: '', // Required but can be empty
             role: 'user' // Default role
           }]);
 
@@ -36,6 +38,18 @@ export const AuthProvider = ({ children }) => {
           await supabase.auth.signOut();
           setUser(null);
           return;
+        }
+
+        // Create default notification preferences
+        const { error: prefError } = await supabase
+          .from('notification_preferences')
+          .insert([{
+            user_id: user.id,
+            // Default values are handled by the database
+          }]);
+
+        if (prefError) {
+          console.error('Error creating notification preferences:', prefError);
         }
       }
     } catch (error) {
