@@ -15,6 +15,7 @@ const AuthGuard = ({ children }) => {
   }
 
   if (!user) {
+    // Save the attempted URL for redirecting after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
