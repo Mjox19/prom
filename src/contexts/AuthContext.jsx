@@ -11,17 +11,17 @@ export const AuthProvider = ({ children }) => {
     if (!user) return;
     
     try {
-      // Check if user record exists
-      const { data: existingUser } = await supabase
-        .from('users')
+      // Check if profile record exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
         .select('id')
         .eq('id', user.id)
         .single();
 
-      if (!existingUser) {
-        // Create new user record if none exists
+      if (!existingProfile) {
+        // Create new profile record if none exists
         const { error: insertError } = await supabase
-          .from('users')
+          .from('profiles')
           .insert([{
             id: user.id,
             email: user.email,
@@ -31,15 +31,15 @@ export const AuthProvider = ({ children }) => {
           }]);
 
         if (insertError) {
-          console.error('Error creating user record:', insertError);
-          // If user creation fails, sign out the user
+          console.error('Error creating profile record:', insertError);
+          // If profile creation fails, sign out the user
           await supabase.auth.signOut();
           setUser(null);
           return;
         }
       }
     } catch (error) {
-      console.error('Error ensuring user record exists:', error);
+      console.error('Error ensuring profile record exists:', error);
       // If there's an error, sign out the user
       await supabase.auth.signOut();
       setUser(null);
