@@ -377,26 +377,27 @@ const Customers = () => {
 
   const loadData = async () => {
     try {
-      // Get customers
+      // Get customers owned by the current user
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (customersError) throw customersError;
 
-      // Get quotes
+      // Get quotes for the user's customers
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
         .select('*')
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);
 
       if (quotesError) throw quotesError;
 
-      // Get orders
+      // Get orders for the user's customers
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);
 
       if (ordersError) throw ordersError;
 
@@ -417,7 +418,10 @@ const Customers = () => {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .insert([formData])
+        .insert([{
+          ...formData,
+          user_id: user.id // Associate the customer with the current user
+        }])
         .select()
         .single();
 
@@ -444,8 +448,12 @@ const Customers = () => {
       try {
         const { error } = await supabase
           .from('customers')
-          .update(formData)
-          .eq('id', selectedCustomer.id);
+          .update({
+            ...formData,
+            user_id: user.id // Ensure user_id is preserved on update
+          })
+          .eq('id', selectedCustomer.id)
+          .eq('user_id', user.id); // Additional check to ensure ownership
 
         if (error) throw error;
 
@@ -473,7 +481,8 @@ const Customers = () => {
         const { error } = await supabase
           .from('customers')
           .delete()
-          .eq('id', selectedCustomer.id);
+          .eq('id', selectedCustomer.id)
+          .eq('user_id', user.id); // Additional check to ensure ownership
 
         if (error) throw error;
 
