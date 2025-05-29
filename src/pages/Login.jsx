@@ -17,7 +17,6 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     
-    // Add validation check for empty fields
     if (!email || !password) {
       toast({
         title: "Validation Error",
