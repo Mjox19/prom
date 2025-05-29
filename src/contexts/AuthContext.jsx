@@ -11,12 +11,12 @@ export const AuthProvider = ({ children }) => {
     if (!user) return;
     
     try {
-      // Check if profile record exists
+      // Check if profile record exists - using maybeSingle() instead of single()
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!existingProfile) {
         // Create new profile record if none exists
@@ -40,16 +40,23 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Create default notification preferences
-        const { error: prefError } = await supabase
-          .from('notification_preferences')
-          .insert([{
-            user_id: user.id,
-            // Default values are handled by the database
-          }]);
+        // Create default notification preferences using service role client
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const { error: prefError } = await supabase
+            .from('notification_preferences')
+            .insert([{
+              user_id: user.id,
+              // Default values are handled by the database
+            }], {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`
+              }
+            });
 
-        if (prefError) {
-          console.error('Error creating notification preferences:', prefError);
+          if (prefError) {
+            console.error('Error creating notification preferences:', prefError);
+          }
         }
       }
     } catch (error) {
