@@ -23,7 +23,7 @@ function App() {
           <Route path="orders" element={<Orders />} />
           <Route path="settings" element={<Settings />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/\" replace />} />
       </Routes>
       <Toaster />
     </Router>
