@@ -2,22 +2,13 @@ import React from "react";
 import { Search, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/contexts/AuthContext";
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
+import { getCurrentUser } from "@/lib/supabase";
 
 const Header = ({ title }) => {
-  const { user } = useAuth();
+  const user = getCurrentUser();
   
-  // Get user's name from email (before @) and capitalize first letters
-  const displayName = user?.email 
-    ? user.email
-        .split('@')[0]
-        .split('.')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ')
-    : 'User';
-
-  // Create initials from the display name
+  const displayName = `${user.first_name} ${user.last_name}`;
   const initials = displayName
     .split(' ')
     .map(part => part[0])

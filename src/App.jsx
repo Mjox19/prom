@@ -8,31 +8,25 @@ import Customers from '@/pages/Customers';
 import Products from '@/pages/Products';
 import Orders from '@/pages/Orders';
 import Settings from '@/pages/Settings';
-import Login from '@/pages/Login';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/AuthContext';
-import AuthGuard from '@/components/AuthGuard';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-            <Route index element={<Dashboard />} />
-            <Route path="quotes" element={<Quotes />} />
-            <Route path="sales" element={<Sales />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="products" element={<Products />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/\" replace />} />
-        </Routes>
-        <Toaster />
-      </Router>
-    </AuthProvider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="quotes" element={<Quotes />} />
+          <Route path="sales" element={<Sales />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="products" element={<Products />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster />
+    </Router>
   );
 }
 
