@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }) => {
             email: user.email,
             first_name: user.email.split('@')[0], // Set a default first name
             last_name: '', // Required field, temporary value
-            role: 'user' // Default role as per schema
+            role: 'user' // Default role
           }]);
 
         if (insertError) {
