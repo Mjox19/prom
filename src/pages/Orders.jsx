@@ -228,7 +228,7 @@ const Orders = () => {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `customer_id=eq.${user.id}`,
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
@@ -251,7 +251,7 @@ const Orders = () => {
 
   const loadData = async () => {
     try {
-      // Fetch orders with their delivery information
+      // Fetch orders with their delivery information for the current user
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -266,16 +266,17 @@ const Orders = () => {
           ),
           delivery:deliveries(*)
         `)
-        .eq('customer_id', user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
       setOrders(ordersData);
 
-      // Fetch customers
+      // Fetch customers owned by the current user
       const { data: customersData, error: customersError } = await supabase
-        .from('profiles')
-        .select('*');
+        .from('customers')
+        .select('*')
+        .eq('user_id', user.id);
 
       if (customersError) throw customersError;
       setCustomers(customersData);
@@ -303,11 +304,12 @@ const Orders = () => {
 
       const totalAmount = 0; // Calculate based on your business logic
 
-      // Create order
+      // Create order with user_id
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
           customer_id: formData.customerId,
+          user_id: user.id, // Associate the order with the current user
           status: 'pending',
           total_amount: totalAmount,
           shipping_address: formData.shippingAddress
