@@ -42,7 +42,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { getCustomers, getCustomerById, addCustomer, updateCustomer, deleteCustomer, seedCustomers } from "@/lib/customerData";
+import { getCustomers, getCustomerById, addCustomer, updateCustomer, deleteCustomer } from "@/lib/customerData";
+import { seedData } from "@/lib/data";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
@@ -371,7 +372,7 @@ const Customers = () => {
 
   useEffect(() => {
     // Seed and load customers data
-    seedCustomers();
+    seedData();
     loadData();
   }, []);
 
