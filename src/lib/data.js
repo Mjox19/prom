@@ -15,74 +15,6 @@ const initializeAllStorage = () => {
 
 initializeAllStorage();
 
-
-// Convert quote to sale
-export const convertQuoteToSale = (quoteId) => {
-  const quote = getQuoteById(quoteId);
-  if (!quote) return null;
-  
-  const sale = {
-    quoteId: quote.id,
-    customerId: quote.customerId,
-    amount: quote.total,
-    title: `Sale from quote #${quote.id.substring(0, 8)}`,
-    description: quote.description || '',
-    status: 'lead'
-  };
-  
-  const newSale = addSale(sale);
-  updateQuote(quoteId, { status: 'accepted' });
-  return newSale;
-};
-
-// Get dashboard stats
-export const getDashboardStats = () => {
-  const quotes = getQuotes();
-  const sales = getSales();
-  const customers = getCustomers();
-  
-  const totalQuotes = quotes.length;
-  const totalSales = sales.length;
-  const totalCustomers = customers.length;
-  
-  const pendingQuotes = quotes.filter(q => q.status === 'sent').length;
-  const acceptedQuotes = quotes.filter(q => q.status === 'accepted').length;
-  const declinedQuotes = quotes.filter(q => q.status === 'declined').length;
-  
-  const wonSales = sales.filter(s => s.status === 'won').length;
-  const lostSales = sales.filter(s => s.status === 'lost').length;
-  const activeSales = sales.filter(s => !['won', 'lost'].includes(s.status)).length;
-  
-  const totalQuoteValue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
-  const totalSalesValue = sales
-    .filter(s => s.status === 'won')
-    .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
-  
-  const recentQuotes = [...quotes]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5);
-    
-  const recentSales = [...sales]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5);
-  
-  return {
-    totalQuotes,
-    totalSales,
-    totalCustomers,
-    pendingQuotes,
-    acceptedQuotes,
-    declinedQuotes,
-    wonSales,
-    lostSales,
-    activeSales,
-    totalQuoteValue,
-    totalSalesValue,
-    recentQuotes,
-    recentSales
-  };
-};
-
 // Seed data for testing
 export const seedData = () => {
   // Clear existing data for customers, quotes, sales. Products are seeded separately.
@@ -93,28 +25,40 @@ export const seedData = () => {
   // Add sample customers
   const customersData = [
     {
-      name: 'Acme Corporation',
+      company_name: 'Acme Corporation',
+      first_name: 'John',
+      last_name: 'Smith',
       email: 'contact@acme.com',
       phone: '555-123-4567',
       address: '123 Business Ave, Suite 100, New York, NY 10001',
-      contactPerson: 'John Smith',
-      notes: 'Large enterprise client with multiple departments'
+      country: 'United States',
+      contact_language: 'english',
+      customer_type: 'end_client',
+      bio: 'Large enterprise client with multiple departments'
     },
     {
-      name: 'TechStart Inc.',
+      company_name: 'TechStart Inc.',
+      first_name: 'Sarah',
+      last_name: 'Johnson',
       email: 'info@techstart.io',
       phone: '555-987-6543',
       address: '456 Innovation Blvd, San Francisco, CA 94107',
-      contactPerson: 'Sarah Johnson',
-      notes: 'Startup with rapid growth, interested in premium services'
+      country: 'United States',
+      contact_language: 'english',
+      customer_type: 'end_client',
+      bio: 'Startup with rapid growth, interested in premium services'
     },
     {
-      name: 'Global Retail Solutions',
+      company_name: 'Global Retail Solutions',
+      first_name: 'Michael',
+      last_name: 'Chen',
       email: 'sales@globalretail.com',
       phone: '555-456-7890',
       address: '789 Commerce St, Chicago, IL 60611',
-      contactPerson: 'Michael Chen',
-      notes: 'Retail chain looking for enterprise solutions'
+      country: 'United States',
+      contact_language: 'english',
+      customer_type: 'reseller',
+      bio: 'Retail chain looking for enterprise solutions'
     }
   ];
   
@@ -187,5 +131,72 @@ export const seedData = () => {
     customerIds,
     quoteIds,
     message: 'Sample data has been added successfully'
+  };
+};
+
+// Convert quote to sale
+export const convertQuoteToSale = (quoteId) => {
+  const quote = getQuoteById(quoteId);
+  if (!quote) return null;
+  
+  const sale = {
+    quoteId: quote.id,
+    customerId: quote.customerId,
+    amount: quote.total,
+    title: `Sale from quote #${quote.id.substring(0, 8)}`,
+    description: quote.description || '',
+    status: 'lead'
+  };
+  
+  const newSale = addSale(sale);
+  updateQuote(quoteId, { status: 'accepted' });
+  return newSale;
+};
+
+// Get dashboard stats
+export const getDashboardStats = () => {
+  const quotes = getQuotes();
+  const sales = getSales();
+  const customers = getCustomers();
+  
+  const totalQuotes = quotes.length;
+  const totalSales = sales.length;
+  const totalCustomers = customers.length;
+  
+  const pendingQuotes = quotes.filter(q => q.status === 'sent').length;
+  const acceptedQuotes = quotes.filter(q => q.status === 'accepted').length;
+  const declinedQuotes = quotes.filter(q => q.status === 'declined').length;
+  
+  const wonSales = sales.filter(s => s.status === 'won').length;
+  const lostSales = sales.filter(s => s.status === 'lost').length;
+  const activeSales = sales.filter(s => !['won', 'lost'].includes(s.status)).length;
+  
+  const totalQuoteValue = quotes.reduce((sum, q) => sum + (parseFloat(q.total) || 0), 0);
+  const totalSalesValue = sales
+    .filter(s => s.status === 'won')
+    .reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  
+  const recentQuotes = [...quotes]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+    
+  const recentSales = [...sales]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+  
+  return {
+    totalQuotes,
+    totalSales,
+    totalCustomers,
+    pendingQuotes,
+    acceptedQuotes,
+    declinedQuotes,
+    wonSales,
+    lostSales,
+    activeSales,
+    totalQuoteValue,
+    totalSalesValue,
+    recentQuotes,
+    recentSales
   };
 };

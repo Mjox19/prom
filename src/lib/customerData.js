@@ -2,6 +2,7 @@ import { getAllItems, getItemById, addItem, updateItem, deleteItem } from '@/lib
 
 const CUSTOMERS_KEY = 'customers';
 
+// Basic CRUD operations for customers
 export const getCustomers = () => getAllItems(CUSTOMERS_KEY);
 export const getCustomerById = (id) => getItemById(CUSTOMERS_KEY, id);
 export const addCustomer = (customer) => addItem(CUSTOMERS_KEY, customer);
