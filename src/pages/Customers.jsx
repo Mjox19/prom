@@ -42,7 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { getCustomers, getCustomerById, addCustomer, updateCustomer, deleteCustomer, seedCustomers } from "@/lib/customerData";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
@@ -370,40 +370,50 @@ const Customers = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      loadData();
-    }
-  }, [user]);
+    // Seed and load customers data
+    seedCustomers();
+    loadData();
+  }, []);
 
-  const loadData = async () => {
+  const loadData = () => {
     try {
-      // Get customers owned by the current user
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', user.id);
+      // Get customers from localStorage
+      const customersData = getCustomers();
+      
+      // For demo purposes, create some mock quotes and orders related to customers
+      const mockQuotes = [];
+      const mockOrders = [];
+      
+      // Create some mock quotes and orders for each customer
+      customersData.forEach(customer => {
+        // Add 0-2 quotes per customer
+        const quoteCount = Math.floor(Math.random() * 3);
+        for (let i = 0; i < quoteCount; i++) {
+          mockQuotes.push({
+            id: `quote-${customer.id}-${i}`,
+            customer_id: customer.id,
+            title: `Quote #${i+1} for ${customer.company_name}`,
+            status: ['draft', 'sent', 'accepted', 'rejected'][Math.floor(Math.random() * 4)],
+            amount: Math.floor(Math.random() * 10000) + 1000
+          });
+        }
+        
+        // Add 0-2 orders per customer
+        const orderCount = Math.floor(Math.random() * 3);
+        for (let i = 0; i < orderCount; i++) {
+          mockOrders.push({
+            id: `order-${customer.id}-${i}`,
+            customer_id: customer.id,
+            title: `Order #${i+1} from ${customer.company_name}`,
+            status: ['processing', 'shipped', 'delivered', 'cancelled'][Math.floor(Math.random() * 4)],
+            amount: Math.floor(Math.random() * 8000) + 2000
+          });
+        }
+      });
 
-      if (customersError) throw customersError;
-
-      // Get quotes for the user's customers
-      const { data: quotesData, error: quotesError } = await supabase
-        .from('quotes')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (quotesError) throw quotesError;
-
-      // Get orders for the user's customers
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (ordersError) throw ordersError;
-
-      setCustomers(customersData || []);
-      setQuotes(quotesData || []);
-      setOrders(ordersData || []);
+      setCustomers(customersData);
+      setQuotes(mockQuotes);
+      setOrders(mockOrders);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -414,19 +424,9 @@ const Customers = () => {
     }
   };
 
-  const handleCreateSubmit = async (formData) => {
+  const handleCreateSubmit = (formData) => {
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([{
-          ...formData,
-          user_id: user.id // Associate the customer with the current user
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      const newCustomer = addCustomer(formData);
       loadData();
       setIsCreateDialogOpen(false);
       toast({ 
@@ -443,20 +443,10 @@ const Customers = () => {
     }
   };
 
-  const handleEditSubmit = async (formData) => {
+  const handleEditSubmit = (formData) => {
     if (selectedCustomer) {
       try {
-        const { error } = await supabase
-          .from('customers')
-          .update({
-            ...formData,
-            user_id: user.id // Ensure user_id is preserved on update
-          })
-          .eq('id', selectedCustomer.id)
-          .eq('user_id', user.id); // Additional check to ensure ownership
-
-        if (error) throw error;
-
+        const updatedCustomer = updateCustomer(selectedCustomer.id, formData);
         loadData();
         setIsEditDialogOpen(false);
         setSelectedCustomer(null);
@@ -475,17 +465,10 @@ const Customers = () => {
     }
   };
 
-  const handleDeleteCustomer = async () => {
+  const handleDeleteCustomer = () => {
     if (selectedCustomer) {
       try {
-        const { error } = await supabase
-          .from('customers')
-          .delete()
-          .eq('id', selectedCustomer.id)
-          .eq('user_id', user.id); // Additional check to ensure ownership
-
-        if (error) throw error;
-
+        deleteCustomer(selectedCustomer.id);
         loadData();
         setIsDeleteDialogOpen(false);
         setSelectedCustomer(null);
