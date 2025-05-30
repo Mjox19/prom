@@ -26,8 +26,48 @@ const Quotes = () => {
   useEffect(() => {
     if (user) {
       loadPageData();
+      subscribeToChanges();
     }
   }, [user]);
+
+  const subscribeToChanges = () => {
+    const quotesChannel = supabase
+      .channel('quotes-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotes',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          loadPageData();
+        }
+      )
+      .subscribe();
+
+    const customersChannel = supabase
+      .channel('customers-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customers',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          loadPageData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(quotesChannel);
+      supabase.removeChannel(customersChannel);
+    };
+  };
 
   const loadPageData = async () => {
     try {
@@ -42,10 +82,11 @@ const Quotes = () => {
 
       if (quotesError) throw quotesError;
 
-      // Get customers from the customers table
+      // Get customers owned by the current user
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (customersError) throw customersError;
 
@@ -81,7 +122,7 @@ const Quotes = () => {
             updated_at: new Date().toISOString()
           })
           .eq('id', editingQuote.id)
-          .eq('user_id', user.id); // Check user ownership
+          .eq('user_id', user.id);
 
         if (error) throw error;
 
@@ -93,7 +134,7 @@ const Quotes = () => {
         const { error } = await supabase
           .from('quotes')
           .insert([{
-            user_id: user.id, // Set the user_id to the authenticated user
+            user_id: user.id,
             title: quoteData.title,
             customer_id: quoteData.customerId,
             description: quoteData.description,
@@ -101,7 +142,7 @@ const Quotes = () => {
             tax: quoteData.tax,
             total: quoteData.total,
             valid_until: validUntil.toISOString(),
-            status: 'draft' // Explicitly set initial status
+            status: 'draft'
           }]);
 
         if (error) throw error;
@@ -112,7 +153,6 @@ const Quotes = () => {
         });
       }
 
-      loadPageData();
       setIsFormDialogOpen(false);
       setEditingQuote(null);
     } catch (error) {
@@ -134,11 +174,10 @@ const Quotes = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .eq('user_id', user.id); // Check user ownership
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      loadPageData();
       toast({
         title: "Status Updated",
         description: `Quote status updated to ${newStatus}.`
@@ -160,11 +199,10 @@ const Quotes = () => {
           .from('quotes')
           .delete()
           .eq('id', selectedQuote.id)
-          .eq('user_id', user.id); // Check user ownership
+          .eq('user_id', user.id);
 
         if (error) throw error;
 
-        loadPageData();
         setIsDeleteDialogOpen(false);
         setSelectedQuote(null);
         toast({
@@ -211,7 +249,6 @@ const Quotes = () => {
       // Update quote status
       await handleUpdateStatus(quoteId, 'accepted');
 
-      loadPageData();
       toast({
         title: "Quote Converted",
         description: "Quote successfully converted to sale."
