@@ -1,3 +1,4 @@
+// Current content of src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -9,7 +10,7 @@ export const AuthProvider = ({ children }) => {
 
   const ensureProfile = async (user) => {
     if (!user) return;
-    
+
     try {
       // Check if profile record exists - using maybeSingle() instead of single()
       const { data: existingProfile } = await supabase
@@ -40,24 +41,27 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
+        // --- REMOVE THIS BLOCK: Notification preferences are handled by DB trigger ---
         // Create default notification preferences using service role client
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          const { error: prefError } = await supabase
-            .from('notification_preferences')
-            .insert([{
-              user_id: user.id,
-              // Default values are handled by the database
-            }], {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`
-              }
-            });
+        // const { data: { session } } = await supabase.auth.getSession();
+        // if (session?.access_token) {
+        //   const { error: prefError } = await supabase
+        //     .from('notification_preferences')
+        //     .insert([{
+        //       user_id: user.id,
+        //       // Default values are handled by the database
+        //     }], {
+        //       headers: {
+        //         Authorization: `Bearer ${session.access_token}`
+        //       }
+        //     });
 
-          if (prefError) {
-            console.error('Error creating notification preferences:', prefError);
-          }
-        }
+        //   if (prefError) {
+        //     console.error('Error creating notification preferences:', prefError);
+        //   }
+        // }
+        // --- END REMOVAL BLOCK ---
+
       }
     } catch (error) {
       console.error('Error ensuring profile record exists:', error);
