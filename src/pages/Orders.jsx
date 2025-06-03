@@ -266,7 +266,7 @@ const Orders = () => {
           ),
           delivery:deliveries(*)
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', user.id)  // Changed from customer_id to user_id
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;

@@ -71,11 +71,11 @@ const Dashboard = () => {
 
       if (quotesError) throw quotesError;
 
-      // Get orders for the current user's customers
+      // Get orders for the current user
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);  // Changed from customer_id to user_id
 
       if (ordersError) throw ordersError;
 

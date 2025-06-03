@@ -121,7 +121,7 @@ const Sales = () => {
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('customer_id', user.id)
+        .eq('user_id', user.id)  // Changed from customer_id to user_id
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
