@@ -235,9 +235,11 @@ const Quotes = () => {
 
       if (customerError) throw customerError;
 
+      // Include user_id in the order creation
       const { error } = await supabase
         .from('orders')
         .insert([{
+          user_id: user.id, // Add the user_id field
           customer_id: quote.customer_id,
           status: 'pending',
           total_amount: quote.total,
