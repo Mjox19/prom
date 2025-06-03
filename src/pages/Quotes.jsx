@@ -235,18 +235,20 @@ const Quotes = () => {
 
       if (customerError) throw customerError;
 
-      // Include user_id in the order creation
-      const { error } = await supabase
+      // Create the order with user_id
+      const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
-          user_id: user.id, // Add the user_id field
+          user_id: user.id,
           customer_id: quote.customer_id,
           status: 'pending',
           total_amount: quote.total,
           shipping_address: customer.address || 'Address pending'
-        }]);
+        }])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (orderError) throw orderError;
 
       // Update quote status
       await handleUpdateStatus(quoteId, 'accepted');
