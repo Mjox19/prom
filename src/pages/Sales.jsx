@@ -22,7 +22,13 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit }) => {
   const [currentSale, setCurrentSale] = useState({
-    customerId: "", title: "", description: "", amount: 0, status: "lead", expectedCloseDate: ""
+    customerId: "", 
+    title: "", 
+    description: "", 
+    amount: 0, 
+    status: "pending",
+    payment_status: "unpaid",
+    expectedCloseDate: ""
   });
 
   useEffect(() => {
@@ -34,7 +40,13 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
   }, [saleToEdit, open]);
 
   const resetCurrentSale = () => setCurrentSale({
-    customerId: "", title: "", description: "", amount: 0, status: "lead", expectedCloseDate: ""
+    customerId: "", 
+    title: "", 
+    description: "", 
+    amount: 0, 
+    status: "pending",
+    payment_status: "unpaid",
+    expectedCloseDate: ""
   });
 
   const handleChange = (id, value) => setCurrentSale(prev => ({ ...prev, [id]: value }));
@@ -42,6 +54,12 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
   const handleSubmit = () => {
     onSubmit(currentSale);
   };
+
+  const paymentStatuses = [
+    { value: "unpaid", label: "Unpaid" },
+    { value: "half_paid", label: "Half Paid" },
+    { value: "fully_paid", label: "Fully Paid" }
+  ];
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { onOpenChange(isOpen); if(!isOpen) resetCurrentSale(); }}>
@@ -56,15 +74,25 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
               <Label htmlFor="customer">Customer</Label>
               <Select value={currentSale.customerId} onValueChange={(val) => handleChange("customerId", val)}>
                 <SelectTrigger id="customer"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {customers.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {`${c.first_name} ${c.last_name}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={currentSale.status} onValueChange={(val) => handleChange("status", val)}>
-                <SelectTrigger id="status"><SelectValue placeholder="Select status" /></SelectTrigger>
+              <Label htmlFor="payment_status">Payment Status</Label>
+              <Select value={currentSale.payment_status} onValueChange={(val) => handleChange("payment_status", val)}>
+                <SelectTrigger id="payment_status"><SelectValue placeholder="Select payment status" /></SelectTrigger>
                 <SelectContent>
-                  {["lead", "negotiation", "won", "lost"].map(s => <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
+                  {paymentStatuses.map(status => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -117,24 +145,27 @@ const Sales = () => {
 
   const loadPageData = async () => {
     try {
-      // Get orders (sales)
+      // Get orders (sales) with customer details
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
-        .select('*')
-        .eq('user_id', user.id)  // Changed from customer_id to user_id
+        .select(`
+          *,
+          customer:customers(id, first_name, last_name)
+        `)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
 
-      // Get profiles (customers)
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+      setSales(orders || []);
+      
+      // Get all customers
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
         .select('*');
 
-      if (profilesError) throw profilesError;
+      if (customersError) throw customersError;
 
-      setSales(orders || []);
-      setCustomers(profiles || []);
+      setCustomers(customersData || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -153,6 +184,7 @@ const Sales = () => {
           .update({
             customer_id: saleData.customerId,
             status: saleData.status,
+            payment_status: saleData.payment_status,
             total_amount: saleData.amount,
             updated_at: new Date().toISOString()
           })
@@ -170,8 +202,9 @@ const Sales = () => {
           .insert([{
             customer_id: saleData.customerId,
             status: saleData.status,
+            payment_status: saleData.payment_status,
             total_amount: saleData.amount,
-            shipping_address: "TBD" // Required field
+            shipping_address: "TBD"
           }]);
 
         if (error) throw error;
@@ -195,12 +228,12 @@ const Sales = () => {
     }
   };
 
-  const handleUpdateStatus = async (id, newStatus) => {
+  const handleUpdatePaymentStatus = async (id, newStatus) => {
     try {
       const { error } = await supabase
         .from('orders')
         .update({ 
-          status: newStatus,
+          payment_status: newStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
@@ -209,14 +242,14 @@ const Sales = () => {
 
       loadPageData();
       toast({
-        title: "Status Updated",
-        description: `Sale status changed to ${newStatus}.`
+        title: "Payment Status Updated",
+        description: `Payment status changed to ${newStatus}.`
       });
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Error updating payment status:', error);
       toast({
         title: "Error",
-        description: "Failed to update status",
+        description: "Failed to update payment status",
         variant: "destructive"
       });
     }
@@ -257,16 +290,26 @@ const Sales = () => {
   };
   
   const filteredSales = sales.filter(sale => {
-    const customer = customers.find(c => c.id === sale.customer_id);
-    const customerName = customer ? customer.full_name.toLowerCase() : "";
-    const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase()) || customerName.includes(searchTerm.toLowerCase());
+    const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? sale.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
 
-  const getCustomerName = (customerId) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.full_name : "Unknown";
+  const getCustomerName = (customer) => {
+    return customer ? `${customer.first_name} ${customer.last_name}` : "Unknown Customer";
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'unpaid':
+        return 'bg-red-100 text-red-800';
+      case 'half_paid':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'fully_paid':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
@@ -314,7 +357,7 @@ const Sales = () => {
                       <TableHead>Customer</TableHead>
                       <TableHead>Created Date</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Payment Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -331,7 +374,7 @@ const Sales = () => {
                           <TableCell>
                             <div className="flex items-center">
                               <User className="h-4 w-4 text-gray-400 mr-2" />
-                              {getCustomerName(sale.customer_id)}
+                              {getCustomerName(sale.customer)}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -347,25 +390,28 @@ const Sales = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className={`status-badge status-${sale.status}`}>
-                              {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(sale.payment_status)}`}>
+                              {sale.payment_status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-1">
+                              <Select
+                                value={sale.payment_status}
+                                onValueChange={(value) => handleUpdatePaymentStatus(sale.id, value)}
+                              >
+                                <SelectTrigger className="w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="unpaid">Unpaid</SelectItem>
+                                  <SelectItem value="half_paid">Half Paid</SelectItem>
+                                  <SelectItem value="fully_paid">Fully Paid</SelectItem>
+                                </SelectContent>
+                              </Select>
                               <Button variant="ghost" size="icon" onClick={() => openEditDialog(sale)} title="Edit Sale">
                                 <Edit className="h-4 w-4 text-amber-500" />
                               </Button>
-                              {sale.status !== 'delivered' && sale.status !== 'cancelled' && (
-                                <>
-                                  <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'delivered')} title="Mark as Delivered">
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleUpdateStatus(sale.id, 'cancelled')} title="Mark as Cancelled">
-                                    <XCircle className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </>
-                              )}
                               <Button variant="ghost" size="icon" onClick={() => {setSelectedSale(sale); setIsDeleteDialogOpen(true);}} title="Delete">
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
