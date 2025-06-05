@@ -9,9 +9,9 @@ import Products from '@/pages/Products';
 import Orders from '@/pages/Orders';
 import Settings from '@/pages/Settings';
 import Login from '@/pages/Login';
+import AuthGuard from '@/components/AuthGuard';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
-import AuthGuard from '@/components/AuthGuard';
 
 function App() {
   return (
@@ -19,7 +19,14 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+          <Route
+            path="/"
+            element={
+              <AuthGuard>
+                <Layout />
+              </AuthGuard>
+            }
+          >
             <Route index element={<Dashboard />} />
             <Route path="quotes" element={<Quotes />} />
             <Route path="sales" element={<Sales />} />

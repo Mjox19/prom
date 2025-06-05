@@ -1,3 +1,4 @@
+// Current content of src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -9,37 +10,61 @@ export const AuthProvider = ({ children }) => {
 
   const ensureProfile = async (user) => {
     if (!user) return;
-    
+
     try {
-      // Check if user record exists
-      const { data: existingUser } = await supabase
-        .from('users')
+      // Check if profile record exists - using maybeSingle() instead of single()
+      const { data: existingProfile } = await supabase
+        .from('profiles')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (!existingUser) {
-        // Create new user record if none exists
+      if (!existingProfile) {
+        // Create new profile record if none exists
         const { error: insertError } = await supabase
-          .from('users')
+          .from('profiles')
           .insert([{
             id: user.id,
             email: user.email,
-            first_name: user.email.split('@')[0], // Set a default first name
-            last_name: '', // Required field, temporary value
+            first_name: user.email.split('@')[0], // Default first name from email
+            last_name: '', // Empty last name
+            avatar_url: null,
+            bio: '', // Required but can be empty
             role: 'user' // Default role
           }]);
 
         if (insertError) {
-          console.error('Error creating user record:', insertError);
-          // If user creation fails, sign out the user
+          console.error('Error creating profile record:', insertError);
+          // If profile creation fails, sign out the user
           await supabase.auth.signOut();
           setUser(null);
           return;
         }
+
+        // --- REMOVE THIS BLOCK: Notification preferences are handled by DB trigger ---
+        // Create default notification preferences using service role client
+        // const { data: { session } } = await supabase.auth.getSession();
+        // if (session?.access_token) {
+        //   const { error: prefError } = await supabase
+        //     .from('notification_preferences')
+        //     .insert([{
+        //       user_id: user.id,
+        //       // Default values are handled by the database
+        //     }], {
+        //       headers: {
+        //         Authorization: `Bearer ${session.access_token}`
+        //       }
+        //     });
+
+        //   if (prefError) {
+        //     console.error('Error creating notification preferences:', prefError);
+        //   }
+        // }
+        // --- END REMOVAL BLOCK ---
+
       }
     } catch (error) {
-      console.error('Error ensuring user record exists:', error);
+      console.error('Error ensuring profile record exists:', error);
       // If there's an error, sign out the user
       await supabase.auth.signOut();
       setUser(null);

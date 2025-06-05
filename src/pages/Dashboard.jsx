@@ -63,26 +63,27 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Get quotes
+      // Get quotes for the current user
       const { data: quotes, error: quotesError } = await supabase
         .from('quotes')
         .select('*')
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);
 
       if (quotesError) throw quotesError;
 
-      // Get orders (sales)
+      // Get orders for the current user
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('customer_id', user.id);
+        .eq('user_id', user.id);  // Changed from customer_id to user_id
 
       if (ordersError) throw ordersError;
 
-      // Get profiles (customers)
+      // Get customers owned by the current user
       const { data: customers, error: customersError } = await supabase
-        .from('profiles')
-        .select('*');
+        .from('customers')
+        .select('*')
+        .eq('user_id', user.id);
 
       if (customersError) throw customersError;
 

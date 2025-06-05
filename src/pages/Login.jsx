@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,20 +14,41 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+  }, [user, navigate, location]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: email.trim(),
+        password: password.trim(),
       });
 
       if (error) throw error;
-      
-      navigate('/');
+
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -64,10 +86,9 @@ const Login = () => {
 
     try {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             first_name: email.split('@')[0],
             last_name: '',
@@ -83,11 +104,21 @@ const Login = () => {
       });
     } catch (error) {
       console.error('Signup error:', error);
-      toast({
-        title: "Signup Failed",
-        description: error.message || "Failed to create account. Please try again.",
-        variant: "destructive"
-      });
+      
+      // Check for the specific "User already registered" error
+      if (error.message === 'User already registered') {
+        toast({
+          title: "Account Exists",
+          description: "This email is already registered. Please sign in instead, or use a different email address.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: error.message || "Failed to create account. Please try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -107,9 +138,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
 
       if (error) throw error;
       
@@ -128,6 +157,11 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // If already authenticated, don't render the login form
+  if (user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-blue-800 flex items-center justify-center p-4">
