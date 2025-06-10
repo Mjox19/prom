@@ -38,7 +38,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
           quantity: item.quantity
         })),
         shippingAddress: order.shipping_address,
-        carrier: order.delivery?.carrier || "fedex"
+        carrier: order.delivery && order.delivery.length > 0 ? order.delivery[0].carrier : "fedex"
       });
     } else {
       setFormData({
@@ -103,7 +103,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                 <SelectContent>
                   {customers.map(customer => (
                     <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
+                      {customer.company_name || `${customer.first_name} ${customer.last_name}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -426,7 +426,7 @@ const Orders = () => {
 
   const getCustomerName = (customerId) => {
     const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.name : 'Unknown';
+    return customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : 'Unknown';
   };
 
   const containerVariants = {
@@ -521,11 +521,11 @@ const Orders = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {order.delivery ? (
+                            {order.delivery && order.delivery.length > 0 ? (
                               <div className="flex items-center space-x-2">
                                 <Truck className="h-4 w-4 text-blue-500" />
-                                <span className={`status-badge status-${order.delivery.status}`}>
-                                  {order.delivery.status.split('_').map(word => 
+                                <span className={`status-badge status-${order.delivery[0].status}`}>
+                                  {(order.delivery[0].status || '').split('_').map(word => 
                                     word.charAt(0).toUpperCase() + word.slice(1)
                                   ).join(' ')}
                                 </span>
@@ -585,11 +585,11 @@ const Orders = () => {
                                   </Button>
                                 </>
                               )}
-                              {order.delivery && order.delivery.status !== 'delivered' && (
+                              {order.delivery && order.delivery.length > 0 && order.delivery[0].status !== 'delivered' && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleUpdateDeliveryStatus(order.delivery.id, 'delivered')}
+                                  onClick={() => handleUpdateDeliveryStatus(order.delivery[0].id, 'delivered')}
                                   title="Mark Delivery as Complete"
                                 >
                                   <CheckCircle className="h-4 w-4 text-green-500" />
