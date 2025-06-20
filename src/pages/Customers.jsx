@@ -48,7 +48,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, subscribeToTable } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
@@ -346,7 +346,7 @@ const CustomerViewDialog = ({ open, onOpenChange, customer, quotes, orders }) =>
                       <ul className="space-y-2">
                         {activity.items.map(item => (
                           <li key={item.id} className="text-sm flex justify-between">
-                            <span>{item.title || `#${item.id.slice(0, 8)}`}</span>
+                            <span>{item.quote_number || item.title || `#${item.id.slice(0, 8)}`}</span>
                             <span className={`status-badge status-${item.status}`}>{item.status}</span>
                           </li>
                         ))}
@@ -386,6 +386,38 @@ const Customers = () => {
   useEffect(() => {
     if (user) {
       loadData();
+      
+      // Subscribe to real-time changes
+      const unsubscribeCustomers = subscribeToTable(
+        'customers',
+        (payload) => {
+          console.log('Customer change detected:', payload);
+          loadData();
+        }
+      );
+
+      const unsubscribeQuotes = subscribeToTable(
+        'quotes',
+        (payload) => {
+          console.log('Quote change detected:', payload);
+          loadData();
+        }
+      );
+
+      const unsubscribeOrders = subscribeToTable(
+        'orders',
+        (payload) => {
+          console.log('Order change detected:', payload);
+          loadData();
+        }
+      );
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeCustomers();
+        unsubscribeQuotes();
+        unsubscribeOrders();
+      };
     }
   }, [user]);
 
@@ -547,7 +579,6 @@ const Customers = () => {
 
       if (error) throw error;
 
-      setCustomers(prev => [newCustomer, ...prev]);
       setIsCreateDialogOpen(false);
       toast({ 
         title: "Customer Created", 
@@ -594,9 +625,6 @@ const Customers = () => {
 
         if (error) throw error;
 
-        setCustomers(prev => prev.map(customer => 
-          customer.id === selectedCustomer.id ? updatedCustomer : customer
-        ));
         setIsEditDialogOpen(false);
         setSelectedCustomer(null);
         toast({ 
@@ -637,7 +665,6 @@ const Customers = () => {
 
         if (error) throw error;
 
-        setCustomers(prev => prev.filter(customer => customer.id !== selectedCustomer.id));
         setIsDeleteDialogOpen(false);
         setSelectedCustomer(null);
         toast({ 

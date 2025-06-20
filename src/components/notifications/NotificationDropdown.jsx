@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, Check, Package, TrendingUp, FileText, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, subscribeToTable } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NotificationDropdown = () => {
@@ -19,52 +19,42 @@ const NotificationDropdown = () => {
     fetchNotifications();
     
     // Subscribe to notification changes if Supabase is configured
-    if (isSupabaseConfigured) {
-      const channel = supabase
-        .channel('notification-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            if (payload.eventType === 'INSERT') {
-              setNotifications(prev => [payload.new, ...prev]);
-              if (!payload.new.read) {
-                setUnreadCount(prev => prev + 1);
-                // Show browser notification if enabled
-                if (Notification.permission === 'granted') {
-                  new Notification(payload.new.title, {
-                    body: payload.new.message,
-                    icon: '/vite.svg'
-                  });
-                }
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              setNotifications(prev =>
-                prev.map(n => n.id === payload.new.id ? payload.new : n)
-              );
-              // Update unread count if read status changed
-              if (payload.old.read !== payload.new.read) {
-                setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
-              }
-            } else if (payload.eventType === 'DELETE') {
-              setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
-              if (!payload.old.read) {
-                setUnreadCount(prev => Math.max(0, prev - 1));
-              }
+    const unsubscribe = subscribeToTable(
+      'notifications',
+      (payload) => {
+        console.log('Notification change detected:', payload);
+        
+        if (payload.eventType === 'INSERT') {
+          setNotifications(prev => [payload.new, ...prev]);
+          if (!payload.new.read) {
+            setUnreadCount(prev => prev + 1);
+            // Show browser notification if enabled
+            if (Notification.permission === 'granted') {
+              new Notification(payload.new.title, {
+                body: payload.new.message,
+                icon: '/vite.svg'
+              });
             }
           }
-        )
-        .subscribe();
+        } else if (payload.eventType === 'UPDATE') {
+          setNotifications(prev =>
+            prev.map(n => n.id === payload.new.id ? payload.new : n)
+          );
+          // Update unread count if read status changed
+          if (payload.old.read !== payload.new.read) {
+            setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          if (!payload.old.read) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      },
+      `user_id=eq.${user.id}`
+    );
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    return unsubscribe;
   }, [user]);
 
   const fetchNotifications = async () => {

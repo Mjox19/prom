@@ -16,7 +16,7 @@ import { CardSkeleton } from "@/components/ui/card-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, subscribeToTable } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const statCards = [
@@ -59,6 +59,38 @@ const Dashboard = () => {
   useEffect(() => {
     if (user) {
       loadDashboardData();
+      
+      // Subscribe to real-time changes for dashboard updates
+      const unsubscribeQuotes = subscribeToTable(
+        'quotes',
+        (payload) => {
+          console.log('Quote change detected on dashboard:', payload);
+          loadDashboardData();
+        }
+      );
+
+      const unsubscribeOrders = subscribeToTable(
+        'orders',
+        (payload) => {
+          console.log('Order change detected on dashboard:', payload);
+          loadDashboardData();
+        }
+      );
+
+      const unsubscribeCustomers = subscribeToTable(
+        'customers',
+        (payload) => {
+          console.log('Customer change detected on dashboard:', payload);
+          loadDashboardData();
+        }
+      );
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeQuotes();
+        unsubscribeOrders();
+        unsubscribeCustomers();
+      };
     }
   }, [user]);
 
@@ -88,6 +120,7 @@ const Dashboard = () => {
           recentQuotes: [
             {
               id: '1',
+              quote_number: 'QT-2025-000001',
               title: 'Demo Quote #1',
               total: 5000,
               status: 'sent',
@@ -95,6 +128,7 @@ const Dashboard = () => {
             },
             {
               id: '2',
+              quote_number: 'QT-2025-000002',
               title: 'Demo Quote #2',
               total: 3500,
               status: 'accepted',
@@ -104,6 +138,7 @@ const Dashboard = () => {
           recentSales: [
             {
               id: '1',
+              quote_number: 'QT-2025-000001',
               title: 'Demo Order #1',
               total_amount: 5000,
               status: 'delivered',
@@ -111,6 +146,7 @@ const Dashboard = () => {
             },
             {
               id: '2',
+              quote_number: 'QT-2025-000002',
               title: 'Demo Order #2',
               total_amount: 3500,
               status: 'processing',
@@ -226,7 +262,7 @@ const Dashboard = () => {
       <div className="flex items-center">
         <Icon className={`h-5 w-5 ${iconColor} mr-3`} />
         <div>
-          <p className="font-medium text-sm">{item.title}</p>
+          <p className="font-medium text-sm">{item.quote_number || item.title}</p>
           <p className="text-xs text-gray-500">
             ${(type === 'quote' ? item.total : item.total_amount)?.toLocaleString()}
           </p>

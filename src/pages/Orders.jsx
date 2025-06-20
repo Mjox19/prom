@@ -21,7 +21,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, subscribeToTable, generateQuoteNumber } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { notificationService } from "@/lib/notificationService";
 
@@ -251,34 +251,39 @@ const Orders = () => {
       // Request notification permission
       notificationService.requestNotificationPermission();
       
-      // Subscribe to real-time changes if Supabase is configured
-      if (isSupabaseConfigured) {
-        subscribeToOrders();
-      }
-    }
-  }, [user]);
-
-  const subscribeToOrders = () => {
-    const channel = supabase
-      .channel('orders-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-        },
+      // Subscribe to real-time changes
+      const unsubscribeOrders = subscribeToTable(
+        'orders',
         (payload) => {
-          console.log('Orders changed:', payload);
+          console.log('Order change detected:', payload);
           loadData();
         }
-      )
-      .subscribe();
+      );
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
+      const unsubscribeDeliveries = subscribeToTable(
+        'deliveries',
+        (payload) => {
+          console.log('Delivery change detected:', payload);
+          loadData();
+        }
+      );
+
+      const unsubscribeCustomers = subscribeToTable(
+        'customers',
+        (payload) => {
+          console.log('Customer change detected:', payload);
+          loadData();
+        }
+      );
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeOrders();
+        unsubscribeDeliveries();
+        unsubscribeCustomers();
+      };
+    }
+  }, [user]);
 
   const loadData = async () => {
     try {
@@ -294,6 +299,7 @@ const Orders = () => {
         setOrders([
           {
             id: '1',
+            quote_number: 'QT-2025-000001',
             customer_id: '1',
             status: 'pending',
             total_amount: 5000,
@@ -369,8 +375,10 @@ const Orders = () => {
     try {
       if (!isSupabaseConfigured) {
         // Demo mode
+        const newQuoteNumber = generateQuoteNumber();
         const newOrder = {
           id: Date.now().toString(),
+          quote_number: newQuoteNumber,
           customer_id: formData.customerId,
           status: 'pending',
           total_amount: 0,
@@ -394,10 +402,13 @@ const Orders = () => {
         setIsFormDialogOpen(false);
         toast({
           title: "Order Created (Demo Mode)",
-          description: "New order has been created in demo data."
+          description: `Order ${newQuoteNumber} has been created in demo data.`
         });
         return;
       }
+
+      // Generate a new quote number for the order
+      const newQuoteNumber = generateQuoteNumber();
 
       // Calculate prices based on quantity
       const orderItems = formData.items.map(item => ({
@@ -414,6 +425,7 @@ const Orders = () => {
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
+          quote_number: newQuoteNumber,
           customer_id: formData.customerId,
           user_id: user.id,
           status: 'pending',
@@ -437,11 +449,12 @@ const Orders = () => {
 
       if (itemsError) throw itemsError;
 
-      // Create delivery record
+      // Create delivery record with the same quote number
       const { error: deliveryError } = await supabase
         .from('deliveries')
         .insert([{
           order_id: order.id,
+          quote_number: newQuoteNumber,
           status: 'pending',
           carrier: formData.carrier,
           estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -466,7 +479,7 @@ const Orders = () => {
       
       toast({
         title: "Order Created",
-        description: "New order has been created successfully."
+        description: `Order ${newQuoteNumber} has been created successfully.`
       });
     } catch (error) {
       console.error('Error creating order:', error);
@@ -654,7 +667,8 @@ const Orders = () => {
       const customerName = customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : '';
       
       const matchesSearch = customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           order.id.toLowerCase().includes(searchTerm.toLowerCase());
+                           order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           order.quote_number?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter ? order.status === statusFilter : true;
       return matchesSearch && matchesStatus;
     })
@@ -791,11 +805,11 @@ const Orders = () => {
                         <TableRow>
                           <TableHead 
                             className="cursor-pointer hover:bg-gray-50 select-none"
-                            onClick={() => handleSort("id")}
+                            onClick={() => handleSort("quote_number")}
                           >
                             <div className="flex items-center space-x-2">
-                              <span>Order ID</span>
-                              {getSortIcon("id")}
+                              <span>Order #</span>
+                              {getSortIcon("quote_number")}
                             </div>
                           </TableHead>
                           <TableHead 
@@ -844,7 +858,7 @@ const Orders = () => {
                               <TableCell className="font-medium">
                                 <div className="flex items-center">
                                   <Package className="h-4 w-4 text-purple-500 mr-2 flex-shrink-0" />
-                                  <span className="truncate">#{order.id.slice(0, 8)}</span>
+                                  <span className="truncate">{order.quote_number || `#${order.id.slice(0, 8)}`}</span>
                                   {isUpcoming && (
                                     <Bell className="h-4 w-4 text-amber-500 ml-2 flex-shrink-0" title="Delivery upcoming in 5 days" />
                                   )}

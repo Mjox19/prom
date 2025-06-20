@@ -22,7 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, subscribeToTable, generateQuoteNumber } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit }) => {
@@ -228,28 +228,28 @@ const Sales = () => {
     if (user) {
       loadPageData();
       
-      // Subscribe to real-time changes if Supabase is configured
-      if (isSupabaseConfigured) {
-        const ordersChannel = supabase
-          .channel('orders-changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'orders',
-            },
-            (payload) => {
-              console.log('Orders changed:', payload);
-              loadPageData();
-            }
-          )
-          .subscribe();
+      // Subscribe to real-time changes
+      const unsubscribeOrders = subscribeToTable(
+        'orders',
+        (payload) => {
+          console.log('Order change detected:', payload);
+          loadPageData();
+        }
+      );
 
-        return () => {
-          supabase.removeChannel(ordersChannel);
-        };
-      }
+      const unsubscribeCustomers = subscribeToTable(
+        'customers',
+        (payload) => {
+          console.log('Customer change detected:', payload);
+          loadPageData();
+        }
+      );
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeOrders();
+        unsubscribeCustomers();
+      };
     }
   }, [user]);
 
@@ -267,6 +267,7 @@ const Sales = () => {
         setSales([
           {
             id: '1',
+            quote_number: 'QT-2025-000001',
             customer_id: '1',
             title: 'Demo Order #1',
             status: 'pending',
@@ -282,6 +283,7 @@ const Sales = () => {
           },
           {
             id: '2',
+            quote_number: 'QT-2025-000002',
             customer_id: '2',
             title: 'Demo Order #2',
             status: 'delivered',
@@ -357,6 +359,7 @@ const Sales = () => {
       setSales([
         {
           id: '1',
+          quote_number: 'DEMO-001',
           customer_id: '1',
           title: 'Demo Order #1',
           status: 'pending',
@@ -408,8 +411,10 @@ const Sales = () => {
             description: "Order details successfully updated in demo data."
           });
         } else {
+          const newQuoteNumber = generateQuoteNumber();
           const newSale = {
             id: Date.now().toString(),
+            quote_number: newQuoteNumber,
             customer_id: saleData.customerId,
             title: saleData.title,
             status: saleData.status,
@@ -421,7 +426,7 @@ const Sales = () => {
           setSales(prev => [newSale, ...prev]);
           toast({
             title: "Order Created (Demo Mode)",
-            description: "New order added to demo data."
+            description: `Order ${newQuoteNumber} added to demo data.`
           });
         }
         
@@ -450,9 +455,12 @@ const Sales = () => {
           description: "Order details successfully updated."
         });
       } else {
+        const newQuoteNumber = generateQuoteNumber();
+        
         const { error } = await supabase
           .from('orders')
           .insert([{
+            quote_number: newQuoteNumber,
             user_id: user.id,
             customer_id: saleData.customerId,
             status: saleData.status,
@@ -465,11 +473,10 @@ const Sales = () => {
 
         toast({
           title: "Order Created",
-          description: "New order added to pipeline."
+          description: `Order ${newQuoteNumber} added to pipeline.`
         });
       }
 
-      loadPageData();
       setIsFormDialogOpen(false);
       setEditingSale(null);
     } catch (error) {
@@ -508,7 +515,6 @@ const Sales = () => {
 
       if (error) throw error;
 
-      loadPageData();
       toast({
         title: "Payment Status Updated",
         description: `Payment status changed to ${newStatus}.`
@@ -546,7 +552,6 @@ const Sales = () => {
 
         if (error) throw error;
 
-        loadPageData();
         setIsDeleteDialogOpen(false);
         setSelectedSale(null);
         toast({
@@ -591,6 +596,7 @@ const Sales = () => {
   const filteredAndSortedSales = sales
     .filter(sale => {
       const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           sale.quote_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            sale.customer?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            sale.customer?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            sale.customer?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -772,11 +778,11 @@ const Sales = () => {
                         <TableRow>
                           <TableHead 
                             className="cursor-pointer hover:bg-gray-50 select-none"
-                            onClick={() => handleSort("title")}
+                            onClick={() => handleSort("quote_number")}
                           >
                             <div className="flex items-center space-x-2">
-                              <span>Order</span>
-                              {getSortIcon("title")}
+                              <span>Order #</span>
+                              {getSortIcon("quote_number")}
                             </div>
                           </TableHead>
                           <TableHead 
@@ -809,7 +815,7 @@ const Sales = () => {
                             <TableCell className="font-medium">
                               <div className="flex items-center">
                                 <TrendingUp className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                                <span className="truncate">{sale.title || `Order #${sale.id.slice(0, 8)}`}</span>
+                                <span className="truncate">{sale.quote_number || sale.title || `Order #${sale.id.slice(0, 8)}`}</span>
                               </div>
                             </TableCell>
                             <TableCell>

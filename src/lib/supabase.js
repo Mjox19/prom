@@ -34,3 +34,40 @@ export const getCurrentUser = () => ({
   first_name: 'Demo',
   last_name: 'User'
 });
+
+// Real-time subscription helper
+export const subscribeToTable = (tableName, callback, filter = null) => {
+  if (!isSupabaseConfigured) {
+    console.log(`Demo mode: Would subscribe to ${tableName} changes`);
+    return () => {}; // Return empty cleanup function
+  }
+
+  const channelName = `${tableName}-changes-${Date.now()}`;
+  
+  let subscription = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: tableName,
+        ...(filter && { filter })
+      },
+      callback
+    );
+
+  subscription.subscribe();
+
+  // Return cleanup function
+  return () => {
+    supabase.removeChannel(subscription);
+  };
+};
+
+// Generate consistent quote number
+export const generateQuoteNumber = () => {
+  const year = new Date().getFullYear();
+  const timestamp = Date.now().toString().slice(-6);
+  return `QT-${year}-${timestamp}`;
+};

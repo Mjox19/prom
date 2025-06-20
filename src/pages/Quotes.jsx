@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import QuoteFormDialog from "@/components/quotes/QuoteFormDialog";
 import QuoteTable from "@/components/quotes/QuoteTable";
 import { generateQuotePDF, emailQuote } from "@/lib/pdfUtils";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, subscribeToTable, generateQuoteNumber } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Quotes = () => {
@@ -29,50 +29,33 @@ const Quotes = () => {
   useEffect(() => {
     if (user) {
       loadPageData();
-      if (isSupabaseConfigured) {
-        subscribeToChanges();
-      }
+      
+      // Subscribe to real-time changes
+      const unsubscribeQuotes = subscribeToTable(
+        'quotes',
+        (payload) => {
+          console.log('Quote change detected:', payload);
+          loadPageData();
+        },
+        `user_id=eq.${user.id}`
+      );
+
+      const unsubscribeCustomers = subscribeToTable(
+        'customers',
+        (payload) => {
+          console.log('Customer change detected:', payload);
+          loadPageData();
+        },
+        `user_id=eq.${user.id}`
+      );
+
+      // Cleanup subscriptions
+      return () => {
+        unsubscribeQuotes();
+        unsubscribeCustomers();
+      };
     }
   }, [user]);
-
-  const subscribeToChanges = () => {
-    const quotesChannel = supabase
-      .channel('quotes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quotes',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          loadPageData();
-        }
-      )
-      .subscribe();
-
-    const customersChannel = supabase
-      .channel('customers-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'customers',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          loadPageData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(quotesChannel);
-      supabase.removeChannel(customersChannel);
-    };
-  };
 
   const loadPageData = async () => {
     try {
@@ -84,7 +67,7 @@ const Quotes = () => {
         setQuotes([
           {
             id: '1',
-            quote_number: 'EU-2025-000001',
+            quote_number: 'QT-2025-000001',
             customer_id: '1',
             title: 'Demo Quote #1',
             description: 'Demo quote for testing',
@@ -97,7 +80,7 @@ const Quotes = () => {
           },
           {
             id: '2',
-            quote_number: 'EU-2025-000002',
+            quote_number: 'QT-2025-000002',
             customer_id: '2',
             title: 'Demo Quote #2',
             description: 'Another demo quote',
@@ -138,7 +121,8 @@ const Quotes = () => {
           *,
           customer:customers(*)
         `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       if (quotesError) throw quotesError;
 
@@ -146,7 +130,8 @@ const Quotes = () => {
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('company_name', { ascending: true });
 
       if (customersError) throw customersError;
 
@@ -203,9 +188,10 @@ const Quotes = () => {
             description: "The quote has been updated in demo data."
           });
         } else {
+          const newQuoteNumber = generateQuoteNumber();
           const newQuote = {
             id: Date.now().toString(),
-            quote_number: `DEMO-${Date.now().toString().slice(-3)}`,
+            quote_number: newQuoteNumber,
             user_id: user.id,
             customer_id: quoteData.customerId,
             title: quoteData.title,
@@ -220,7 +206,7 @@ const Quotes = () => {
           setQuotes(prev => [newQuote, ...prev]);
           toast({
             title: "Quote Created (Demo Mode)",
-            description: "The quote has been created in demo data."
+            description: `Quote ${newQuoteNumber} created in demo data.`
           });
         }
         
@@ -252,9 +238,12 @@ const Quotes = () => {
           description: "The quote has been successfully updated."
         });
       } else {
+        const newQuoteNumber = generateQuoteNumber();
+        
         const { error } = await supabase
           .from('quotes')
           .insert([{
+            quote_number: newQuoteNumber,
             user_id: user.id,
             title: quoteData.title,
             customer_id: quoteData.customerId,
@@ -270,7 +259,7 @@ const Quotes = () => {
 
         toast({
           title: "Quote Created",
-          description: "The quote has been successfully created."
+          description: `Quote ${newQuoteNumber} has been successfully created.`
         });
       }
 
@@ -392,9 +381,11 @@ const Quotes = () => {
 
       if (customerError) throw customerError;
 
+      // Create order with the same quote number
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
+          quote_number: quote.quote_number, // Use the same quote number
           user_id: user.id,
           customer_id: quote.customer_id,
           status: 'pending',
@@ -407,11 +398,24 @@ const Quotes = () => {
 
       if (orderError) throw orderError;
 
+      // Create delivery record with the same quote number
+      const { error: deliveryError } = await supabase
+        .from('deliveries')
+        .insert([{
+          order_id: order.id,
+          quote_number: quote.quote_number, // Use the same quote number
+          status: 'pending',
+          carrier: 'fedex',
+          estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }]);
+
+      if (deliveryError) throw deliveryError;
+
       await handleUpdateStatus(quoteId, 'ordered');
 
       toast({
         title: "Quote Converted",
-        description: "Quote successfully converted to order and will appear in Sales page."
+        description: `Quote ${quote.quote_number} successfully converted to order and will appear in Sales page.`
       });
     } catch (error) {
       console.error('Error converting quote to sale:', error);
