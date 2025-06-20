@@ -126,7 +126,7 @@ export const useFormValidation = (initialValues, rules) => {
     }
   };
 
-  const setTouched = (name) => {
+  const setFieldTouched = (name) => {
     setTouched(prev => ({ ...prev, [name]: true }));
     
     // Validate on blur
@@ -147,7 +147,7 @@ export const useFormValidation = (initialValues, rules) => {
     errors,
     touched,
     setValue,
-    setTouched,
+    setTouched: setFieldTouched,
     validateAll,
     reset,
     isValid
