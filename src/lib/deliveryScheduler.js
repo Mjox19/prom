@@ -57,8 +57,7 @@ export class DeliveryScheduler {
           *,
           order:orders(
             *,
-            customer:customers(*),
-            user:profiles(*)
+            customer:customers(*)
           )
         `)
         .gte('estimated_delivery', fiveDaysFromNow.toISOString())
@@ -74,13 +73,25 @@ export class DeliveryScheduler {
 
       // Send reminders for each delivery
       for (const delivery of deliveries || []) {
-        if (delivery.order && delivery.order.customer && delivery.order.user) {
+        if (delivery.order && delivery.order.customer && delivery.order.user_id) {
           try {
+            // Fetch the user profile separately
+            const { data: userProfile, error: profileError } = await supabase
+              .from('profiles')
+              .select('id, email, first_name, last_name')
+              .eq('id', delivery.order.user_id)
+              .single();
+
+            if (profileError) {
+              console.error(`Error fetching user profile for order ${delivery.order.id}:`, profileError);
+              continue;
+            }
+
             await notificationService.handleDeliveryReminder(
               delivery,
               delivery.order,
               delivery.order.customer,
-              delivery.order.user
+              userProfile
             );
             
             console.log(`Delivery reminder sent for order ${delivery.order.id}`);
