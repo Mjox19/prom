@@ -69,6 +69,7 @@ const Quotes = () => {
             id: '1',
             quote_number: 'QT-2025-000001',
             customer_id: '1',
+            title: 'Demo Quote 1',
             description: 'Demo quote for testing',
             status: 'sent',
             subtotal: 5000,
@@ -81,6 +82,7 @@ const Quotes = () => {
             id: '2',
             quote_number: 'QT-2025-000002',
             customer_id: '2',
+            title: 'Demo Quote 2',
             description: 'Another demo quote',
             status: 'accepted',
             subtotal: 3000,
@@ -149,6 +151,7 @@ const Quotes = () => {
           id: '1',
           quote_number: 'DEMO-001',
           customer_id: '1',
+          title: 'Demo Quote',
           status: 'draft',
           total: 1000,
           created_at: new Date().toISOString()
@@ -191,6 +194,7 @@ const Quotes = () => {
             quote_number: newQuoteNumber,
             user_id: user.id,
             customer_id: quoteData.customerId,
+            title: quoteData.title || 'Untitled Quote',
             description: quoteData.description,
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
@@ -216,6 +220,7 @@ const Quotes = () => {
           .from('quotes')
           .update({
             customer_id: quoteData.customerId,
+            title: quoteData.title || 'Untitled Quote',
             description: quoteData.description,
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
@@ -241,6 +246,7 @@ const Quotes = () => {
             quote_number: newQuoteNumber,
             user_id: user.id,
             customer_id: quoteData.customerId,
+            title: quoteData.title || 'Untitled Quote',
             description: quoteData.description,
             subtotal: quoteData.subtotal,
             tax: quoteData.tax,
@@ -519,7 +525,8 @@ const Quotes = () => {
 
   const filteredQuotes = quotes.filter(quote => {
     const matchesSearch = quote.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         quote.quote_number?.toLowerCase().includes(searchTerm.toLowerCase());
+                         quote.quote_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         quote.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? quote.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
