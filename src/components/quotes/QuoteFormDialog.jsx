@@ -15,7 +15,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   
   const initialValues = {
     customerId: quoteToEdit?.customer_id || "",
-    title: quoteToEdit?.title || "",
     description: quoteToEdit?.description || "",
     items: quoteToEdit?.items?.map(item => ({
       productId: item.productId || "",
@@ -40,7 +39,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   };
 
   const rules = {
-    title: [validationRules.required],
     customerId: [validationRules.required],
     validUntil: [validationRules.required],
     expectedDeliveryDate: [validationRules.required]
@@ -127,10 +125,19 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   }, [values.items]);
 
   const handleSubmit = () => {
+    // Create a quote object with a default title
+    const quoteData = {
+      ...values,
+      title: `Quote for ${customers.find(c => c.id === values.customerId)?.company_name || 'Customer'}`
+    };
+    
     if (validateAll()) {
-      onSubmit(values);
+      onSubmit(quoteData);
     }
   };
+
+  // Check if form is valid for submission
+  const isFormValid = values.customerId && values.validUntil && values.expectedDeliveryDate && values.items.length > 0;
 
   return (
     <>
@@ -148,21 +155,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
             />
           </ValidatedInput>
         )}
-
-        <ValidatedInput
-          label="Quote Title"
-          required
-          error={touched.title && errors.title}
-          success={touched.title && !errors.title && values.title}
-        >
-          <Input
-            value={values.title}
-            onChange={(e) => setValue("title", e.target.value)}
-            onBlur={() => setFieldTouched("title")}
-            placeholder="Enter quote title"
-            className={touched.title && errors.title ? "border-red-500" : ""}
-          />
-        </ValidatedInput>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ValidatedInput
@@ -324,7 +316,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid && Object.keys(touched).length > 0}
+          disabled={!isFormValid}
         >
           {quoteToEdit ? "Save Changes" : "Create Quote"}
         </Button>
