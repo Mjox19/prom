@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import QuoteFormDialog from "@/components/quotes/QuoteFormDialog";
 import QuoteTable from "@/components/quotes/QuoteTable";
+import { generateQuotePDF, emailQuote } from "@/lib/pdfUtils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,6 +21,7 @@ const Quotes = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [editingQuote, setEditingQuote] = useState(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -270,31 +272,75 @@ const Quotes = () => {
 
   const handleSendReminder = async (quote) => {
     try {
+      setSendingReminder(true);
+      
       // Get customer details
       const customer = customers.find(c => c.id === quote.customer_id);
       if (!customer) {
         throw new Error('Customer not found');
       }
 
-      // Create a notification for the user about the reminder being sent
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert([{
-          user_id: user.id,
-          title: 'Quote Reminder Sent',
-          message: `Email reminder sent to ${customer.first_name} ${customer.last_name} for quote ${quote.quote_number}`,
-          type: 'quote'
-        }]);
-
-      if (notificationError) {
-        console.error('Error creating notification:', notificationError);
-      }
-
-      // Simulate email sending (in a real app, you'd call an email service)
+      // Show initial toast
       toast({
-        title: "Reminder Sent",
-        description: `Email reminder sent to ${customer.email} for quote ${quote.quote_number}`,
+        title: "Generating Quote PDF",
+        description: "Creating PDF document for email...",
       });
+
+      // Generate PDF
+      const pdfDoc = generateQuotePDF(quote, customer);
+      
+      // Show sending toast
+      toast({
+        title: "Sending Email",
+        description: `Sending quote ${quote.quote_number} to ${customer.email}...`,
+      });
+
+      // Send email with PDF
+      try {
+        await emailQuote(quote, customer, pdfDoc);
+        
+        // Create a notification for the user about the reminder being sent
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert([{
+            user_id: user.id,
+            title: 'Quote Reminder Sent',
+            message: `Email reminder with PDF sent to ${customer.first_name} ${customer.last_name} for quote ${quote.quote_number}`,
+            type: 'quote'
+          }]);
+
+        if (notificationError) {
+          console.error('Error creating notification:', notificationError);
+        }
+
+        toast({
+          title: "Email Sent Successfully",
+          description: `Quote ${quote.quote_number} with PDF attachment sent to ${customer.email}`,
+        });
+
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        
+        // Fallback: still create notification but indicate email service issue
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert([{
+            user_id: user.id,
+            title: 'Quote Reminder - Email Service Issue',
+            message: `Attempted to send quote ${quote.quote_number} to ${customer.first_name} ${customer.last_name}, but email service is not configured`,
+            type: 'quote'
+          }]);
+
+        if (notificationError) {
+          console.error('Error creating notification:', notificationError);
+        }
+
+        toast({
+          title: "Email Service Not Configured",
+          description: `PDF generated successfully, but email service needs to be set up. Quote: ${quote.quote_number}`,
+          variant: "destructive"
+        });
+      }
 
     } catch (error) {
       console.error('Error sending reminder:', error);
@@ -303,6 +349,8 @@ const Quotes = () => {
         description: "Failed to send email reminder",
         variant: "destructive"
       });
+    } finally {
+      setSendingReminder(false);
     }
   };
   
@@ -380,6 +428,7 @@ const Quotes = () => {
             onConvertToSale={handleConvertToSale}
             onDelete={openDeleteDialog}
             onSendReminder={handleSendReminder}
+            sendingReminder={sendingReminder}
           />
         </div>
       </div>

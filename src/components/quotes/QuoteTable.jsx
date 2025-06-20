@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, Calendar, Edit, Send, CheckCircle, XCircle, Trash2, 
-  MoreVertical, Bell, ShoppingCart 
+  MoreVertical, Bell, ShoppingCart, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale, onDelete, onSendReminder }) => {
+const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale, onDelete, onSendReminder, sendingReminder }) => {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}};
 
@@ -114,8 +114,15 @@ const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {(quote.status === 'sent' || quote.status === 'accepted') && (
-                              <DropdownMenuItem onClick={() => onSendReminder(quote)}>
-                                <Bell className="h-4 w-4 mr-2" />
+                              <DropdownMenuItem 
+                                onClick={() => onSendReminder(quote)}
+                                disabled={sendingReminder}
+                              >
+                                {sendingReminder ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Bell className="h-4 w-4 mr-2" />
+                                )}
                                 Send Email Reminder
                               </DropdownMenuItem>
                             )}
