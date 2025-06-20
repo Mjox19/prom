@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import QuoteFormDialog from "@/components/quotes/QuoteFormDialog";
 import QuoteTable from "@/components/quotes/QuoteTable";
 import { generateQuotePDF, emailQuote } from "@/lib/pdfUtils";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Quotes = () => {
@@ -22,13 +22,16 @@ const Quotes = () => {
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [editingQuote, setEditingQuote] = useState(null);
   const [sendingReminder, setSendingReminder] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
       loadPageData();
-      subscribeToChanges();
+      if (isSupabaseConfigured) {
+        subscribeToChanges();
+      }
     }
   }, [user]);
 
@@ -73,6 +76,61 @@ const Quotes = () => {
 
   const loadPageData = async () => {
     try {
+      setLoading(true);
+
+      if (!isSupabaseConfigured) {
+        // Use demo data when Supabase is not configured
+        console.log('Using demo data - Supabase not configured');
+        setQuotes([
+          {
+            id: '1',
+            quote_number: 'EU-2025-000001',
+            customer_id: '1',
+            title: 'Demo Quote #1',
+            description: 'Demo quote for testing',
+            status: 'sent',
+            subtotal: 5000,
+            tax: 400,
+            total: 5400,
+            created_at: new Date().toISOString(),
+            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: '2',
+            quote_number: 'EU-2025-000002',
+            customer_id: '2',
+            title: 'Demo Quote #2',
+            description: 'Another demo quote',
+            status: 'accepted',
+            subtotal: 3000,
+            tax: 240,
+            total: 3240,
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+            valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ]);
+        
+        setCustomers([
+          {
+            id: '1',
+            company_name: 'Demo Company 1',
+            first_name: 'John',
+            last_name: 'Doe',
+            email: 'john@demo1.com'
+          },
+          {
+            id: '2',
+            company_name: 'Demo Company 2',
+            first_name: 'Jane',
+            last_name: 'Smith',
+            email: 'jane@demo2.com'
+          }
+        ]);
+        
+        setLoading(false);
+        return;
+      }
+
       // Get quotes where the user is the creator
       const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
@@ -98,17 +156,78 @@ const Quotes = () => {
       console.error('Error loading data:', error);
       toast({
         title: "Error",
-        description: "Failed to load quotes data",
+        description: "Failed to load quotes data. Using demo data instead.",
         variant: "destructive"
       });
+      
+      // Fallback to demo data
+      setQuotes([
+        {
+          id: '1',
+          quote_number: 'DEMO-001',
+          customer_id: '1',
+          title: 'Demo Quote',
+          status: 'draft',
+          total: 1000,
+          created_at: new Date().toISOString()
+        }
+      ]);
+      setCustomers([
+        {
+          id: '1',
+          company_name: 'Demo Company',
+          first_name: 'Demo',
+          last_name: 'Customer'
+        }
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleFormSubmit = async (quoteData) => {
     try {
-      // Set valid_until to 5 days from now
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 5);
+
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        if (editingQuote) {
+          setQuotes(prev => prev.map(quote => 
+            quote.id === editingQuote.id 
+              ? { ...quote, ...quoteData, updated_at: new Date().toISOString() }
+              : quote
+          ));
+          toast({
+            title: "Quote Updated (Demo Mode)",
+            description: "The quote has been updated in demo data."
+          });
+        } else {
+          const newQuote = {
+            id: Date.now().toString(),
+            quote_number: `DEMO-${Date.now().toString().slice(-3)}`,
+            user_id: user.id,
+            customer_id: quoteData.customerId,
+            title: quoteData.title,
+            description: quoteData.description,
+            subtotal: quoteData.subtotal,
+            tax: quoteData.tax,
+            total: quoteData.total,
+            status: 'draft',
+            created_at: new Date().toISOString(),
+            valid_until: validUntil.toISOString()
+          };
+          setQuotes(prev => [newQuote, ...prev]);
+          toast({
+            title: "Quote Created (Demo Mode)",
+            description: "The quote has been created in demo data."
+          });
+        }
+        
+        setIsFormDialogOpen(false);
+        setEditingQuote(null);
+        return;
+      }
 
       if (editingQuote) {
         const { error } = await supabase
@@ -169,6 +288,20 @@ const Quotes = () => {
 
   const handleUpdateStatus = async (id, newStatus) => {
     try {
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        setQuotes(prev => prev.map(quote => 
+          quote.id === id 
+            ? { ...quote, status: newStatus, updated_at: new Date().toISOString() }
+            : quote
+        ));
+        toast({
+          title: "Status Updated (Demo Mode)",
+          description: `Quote status updated to ${newStatus} in demo data.`
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('quotes')
         .update({ 
@@ -197,6 +330,19 @@ const Quotes = () => {
   const handleDeleteQuote = async () => {
     if (selectedQuote) {
       try {
+        if (!isSupabaseConfigured) {
+          // Demo mode
+          setQuotes(prev => prev.filter(quote => quote.id !== selectedQuote.id));
+          setIsDeleteDialogOpen(false);
+          setSelectedQuote(null);
+          toast({
+            title: "Quote Deleted (Demo Mode)",
+            description: "The quote has been removed from demo data.",
+            variant: "destructive"
+          });
+          return;
+        }
+
         const { error } = await supabase
           .from('quotes')
           .delete()
@@ -228,7 +374,16 @@ const Quotes = () => {
       const quote = quotes.find(q => q.id === quoteId);
       if (!quote) throw new Error('Quote not found');
 
-      // Get customer details to get the shipping address
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        await handleUpdateStatus(quoteId, 'ordered');
+        toast({
+          title: "Quote Converted (Demo Mode)",
+          description: "Quote converted to order in demo data."
+        });
+        return;
+      }
+
       const { data: customer, error: customerError } = await supabase
         .from('customers')
         .select('address')
@@ -237,7 +392,6 @@ const Quotes = () => {
 
       if (customerError) throw customerError;
 
-      // Create the order with user_id
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
@@ -253,7 +407,6 @@ const Quotes = () => {
 
       if (orderError) throw orderError;
 
-      // Update quote status to ordered
       await handleUpdateStatus(quoteId, 'ordered');
 
       toast({
@@ -274,43 +427,39 @@ const Quotes = () => {
     try {
       setSendingReminder(true);
       
-      // Get customer details
       const customer = customers.find(c => c.id === quote.customer_id);
       if (!customer) {
         throw new Error('Customer not found');
       }
 
-      // Show initial toast
       toast({
         title: "Generating Quote PDF",
         description: "Creating PDF document for email...",
       });
 
-      // Generate PDF
       const pdfDoc = generateQuotePDF(quote, customer);
       
-      // Show sending toast
       toast({
         title: "Sending Email",
         description: `Sending quote ${quote.quote_number} to ${customer.email}...`,
       });
 
-      // Send email with PDF
       try {
         await emailQuote(quote, customer, pdfDoc);
         
-        // Create a notification for the user about the reminder being sent
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert([{
-            user_id: user.id,
-            title: 'Quote Reminder Sent',
-            message: `Email reminder with PDF sent to ${customer.first_name} ${customer.last_name} for quote ${quote.quote_number}`,
-            type: 'quote'
-          }]);
+        if (isSupabaseConfigured) {
+          const { error: notificationError } = await supabase
+            .from('notifications')
+            .insert([{
+              user_id: user.id,
+              title: 'Quote Reminder Sent',
+              message: `Email reminder with PDF sent to ${customer.first_name} ${customer.last_name} for quote ${quote.quote_number}`,
+              type: 'quote'
+            }]);
 
-        if (notificationError) {
-          console.error('Error creating notification:', notificationError);
+          if (notificationError) {
+            console.error('Error creating notification:', notificationError);
+          }
         }
 
         toast({
@@ -321,18 +470,19 @@ const Quotes = () => {
       } catch (emailError) {
         console.error('Email sending failed:', emailError);
         
-        // Fallback: still create notification but indicate email service issue
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert([{
-            user_id: user.id,
-            title: 'Quote Reminder - Email Service Issue',
-            message: `Attempted to send quote ${quote.quote_number} to ${customer.first_name} ${customer.last_name}, but email service is not configured`,
-            type: 'quote'
-          }]);
+        if (isSupabaseConfigured) {
+          const { error: notificationError } = await supabase
+            .from('notifications')
+            .insert([{
+              user_id: user.id,
+              title: 'Quote Reminder - Email Service Issue',
+              message: `Attempted to send quote ${quote.quote_number} to ${customer.first_name} ${customer.last_name}, but email service is not configured`,
+              type: 'quote'
+            }]);
 
-        if (notificationError) {
-          console.error('Error creating notification:', notificationError);
+          if (notificationError) {
+            console.error('Error creating notification:', notificationError);
+          }
         }
 
         toast({
@@ -364,6 +514,11 @@ const Quotes = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const handleCreateQuote = () => {
+    setEditingQuote(null);
+    setIsFormDialogOpen(true);
+  };
+
   const filteredQuotes = quotes.filter(quote => {
     const matchesSearch = quote.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          quote.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -383,7 +538,7 @@ const Quotes = () => {
               if (!isOpen) setEditingQuote(null);
             }}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingQuote(null); }} className="bg-indigo-600 hover:bg-indigo-700">
+                <Button onClick={handleCreateQuote} className="bg-indigo-600 hover:bg-indigo-700">
                   <Plus className="h-4 w-4 mr-2" />Create Quote
                 </Button>
               </DialogTrigger>
@@ -429,6 +584,8 @@ const Quotes = () => {
             onDelete={openDeleteDialog}
             onSendReminder={handleSendReminder}
             sendingReminder={sendingReminder}
+            loading={loading}
+            onCreateQuote={handleCreateQuote}
           />
         </div>
       </div>

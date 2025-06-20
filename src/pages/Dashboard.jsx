@@ -8,12 +8,15 @@ import {
   ArrowUpRight, 
   DollarSign,
   Calendar,
+  Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/card-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const statCards = [
@@ -63,6 +66,63 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
+      if (!isSupabaseConfigured) {
+        // Use demo data when Supabase is not configured
+        console.log('Using demo data - Supabase not configured');
+        
+        // Simulate loading delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setStats({
+          totalQuotes: 5,
+          totalSales: 3,
+          totalCustomers: 8,
+          pendingQuotes: 2,
+          acceptedQuotes: 2,
+          declinedQuotes: 1,
+          wonSales: 2,
+          lostSales: 0,
+          activeSales: 1,
+          totalQuoteValue: 25000,
+          totalSalesValue: 15000,
+          recentQuotes: [
+            {
+              id: '1',
+              title: 'Demo Quote #1',
+              total: 5000,
+              status: 'sent',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: '2',
+              title: 'Demo Quote #2',
+              total: 3500,
+              status: 'accepted',
+              created_at: new Date(Date.now() - 86400000).toISOString()
+            }
+          ],
+          recentSales: [
+            {
+              id: '1',
+              title: 'Demo Order #1',
+              total_amount: 5000,
+              status: 'delivered',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: '2',
+              title: 'Demo Order #2',
+              total_amount: 3500,
+              status: 'processing',
+              created_at: new Date(Date.now() - 86400000).toISOString()
+            }
+          ]
+        });
+        
+        setLoading(false);
+        return;
+      }
+
       // Get quotes for the current user
       const { data: quotes, error: quotesError } = await supabase
         .from('quotes')
@@ -75,7 +135,7 @@ const Dashboard = () => {
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id);  // Changed from customer_id to user_id
+        .eq('user_id', user.id);
 
       if (ordersError) throw ordersError;
 
@@ -108,21 +168,30 @@ const Dashboard = () => {
       console.error('Error loading dashboard data:', error);
       toast({
         title: "Error",
-        description: "Failed to load dashboard data",
+        description: "Failed to load dashboard data. Using demo data instead.",
         variant: "destructive"
+      });
+      
+      // Fallback to demo data
+      setStats({
+        totalQuotes: 0,
+        totalSales: 0,
+        totalCustomers: 0,
+        pendingQuotes: 0,
+        acceptedQuotes: 0,
+        declinedQuotes: 0,
+        wonSales: 0,
+        lostSales: 0,
+        activeSales: 0,
+        totalQuoteValue: 0,
+        totalSalesValue: 0,
+        recentQuotes: [],
+        recentSales: []
       });
     } finally {
       setLoading(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
-      </div>
-    );
-  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -175,22 +244,11 @@ const Dashboard = () => {
     </div>
   );
 
-  return (
-    <div className="h-full flex flex-col">
-      <Header title="Dashboard" />
-      
-      <div className="flex-1 p-6 overflow-y-auto">
-        {(!stats || (stats.totalQuotes === 0 && stats.totalSales === 0 && stats.totalCustomers === 0)) ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="text-center mb-8">
-              <BarChart3 className="h-16 w-16 text-indigo-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to QuoteSales Pro</h1>
-              <p className="text-gray-600 max-w-md">
-                Your comprehensive solution for managing quotes and sales. Get started by creating your first quote or sale.
-              </p>
-            </div>
-          </div>
-        ) : (
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col">
+        <Header title="Dashboard" />
+        <div className="flex-1 p-6 overflow-y-auto">
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -198,102 +256,165 @@ const Dashboard = () => {
             className="space-y-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {statCards.map((card) => (
-                <motion.div key={card.title} variants={itemVariants}>
-                  <Card className="dashboard-card border-none shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-gray-500">
-                        {card.title}
-                      </CardTitle>
-                      <div className={`${card.color} p-2 rounded-full`}>
-                        <card.icon className="h-4 w-4 text-white" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">
-                        {card.formatter(stats[card.statKey] || 0)}
-                      </div>
-                    </CardContent>
-                  </Card>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <motion.div key={index} variants={itemVariants}>
+                  <CardSkeleton showHeader={false} lines={2} />
                 </motion.div>
               ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <motion.div variants={itemVariants}>
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Quote Status</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {[
-                      { label: "Pending", value: stats.pendingQuotes, color: "bg-blue-500" },
-                      { label: "Accepted", value: stats.acceptedQuotes, color: "bg-green-500" },
-                      { label: "Declined", value: stats.declinedQuotes, color: "bg-red-500" },
-                    ].map(status => (
-                      <div key={status.label} className="flex items-center">
-                        {renderProgressBar(status.value, stats.totalQuotes, status.color)}
-                        <span className="ml-4 text-sm font-medium min-w-[80px]">{status.value} {status.label}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={itemVariants}>
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Sales Pipeline</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {[
-                      { label: "Active", value: stats.activeSales, color: "bg-purple-500" },
-                      { label: "Won", value: stats.wonSales, color: "bg-green-500" },
-                      { label: "Lost", value: stats.lostSales, color: "bg-red-500" },
-                    ].map(status => (
-                      <div key={status.label} className="flex items-center">
-                         {renderProgressBar(status.value, stats.totalSales, status.color)}
-                        <span className="ml-4 text-sm font-medium min-w-[80px]">{status.value} {status.label}</span>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <motion.div variants={itemVariants}>
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Recent Quotes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {stats.recentQuotes.length > 0 ? (
-                      stats.recentQuotes.map((quote) => renderRecentActivityItem(quote, FileText, "text-blue-500", "quote"))
-                    ) : (
-                      <p className="text-gray-500 text-sm">No recent quotes</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              <motion.div variants={itemVariants}>
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Recent Sales</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {stats.recentSales.length > 0 ? (
-                      stats.recentSales.map((sale) => renderRecentActivityItem(sale, TrendingUp, "text-green-500", "sale"))
-                    ) : (
-                      <p className="text-gray-500 text-sm">No recent sales</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <motion.div key={index} variants={itemVariants}>
+                  <CardSkeleton lines={4} />
+                </motion.div>
+              ))}
             </div>
           </motion.div>
-        )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats || (stats.totalQuotes === 0 && stats.totalSales === 0 && stats.totalCustomers === 0)) {
+    return (
+      <div className="h-full flex flex-col">
+        <Header title="Dashboard" />
+        <div className="flex-1 p-6 overflow-y-auto">
+          <EmptyState
+            icon={BarChart3}
+            title="Welcome to QuoteSales Pro"
+            description="Your comprehensive solution for managing quotes and sales. Get started by creating your first quote, adding customers, or exploring the features."
+            action={true}
+            actionLabel="Get Started"
+            onAction={() => window.location.href = '/quotes'}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <Header title="Dashboard" />
+      
+      <div className="flex-1 p-6 overflow-y-auto">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {statCards.map((card) => (
+              <motion.div key={card.title} variants={itemVariants}>
+                <Card className="dashboard-card border-none shadow-md">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-500">
+                      {card.title}
+                    </CardTitle>
+                    <div className={`${card.color} p-2 rounded-full`}>
+                      <card.icon className="h-4 w-4 text-white" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {card.formatter(stats[card.statKey] || 0)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <motion.div variants={itemVariants}>
+              <Card className="border-none shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg">Quote Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { label: "Pending", value: stats.pendingQuotes, color: "bg-blue-500" },
+                    { label: "Accepted", value: stats.acceptedQuotes, color: "bg-green-500" },
+                    { label: "Declined", value: stats.declinedQuotes, color: "bg-red-500" },
+                  ].map(status => (
+                    <div key={status.label} className="flex items-center">
+                      {renderProgressBar(status.value, stats.totalQuotes, status.color)}
+                      <span className="ml-4 text-sm font-medium min-w-[80px]">{status.value} {status.label}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <Card className="border-none shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg">Sales Pipeline</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { label: "Active", value: stats.activeSales, color: "bg-purple-500" },
+                    { label: "Won", value: stats.wonSales, color: "bg-green-500" },
+                    { label: "Lost", value: stats.lostSales, color: "bg-red-500" },
+                  ].map(status => (
+                    <div key={status.label} className="flex items-center">
+                       {renderProgressBar(status.value, stats.totalSales, status.color)}
+                      <span className="ml-4 text-sm font-medium min-w-[80px]">{status.value} {status.label}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <motion.div variants={itemVariants}>
+              <Card className="border-none shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg">Recent Quotes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {stats.recentQuotes.length > 0 ? (
+                    stats.recentQuotes.map((quote) => renderRecentActivityItem(quote, FileText, "text-blue-500", "quote"))
+                  ) : (
+                    <EmptyState
+                      icon={FileText}
+                      title="No recent quotes"
+                      description="Create your first quote to see activity here."
+                      action={true}
+                      actionLabel="Create Quote"
+                      onAction={() => window.location.href = '/quotes'}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <Card className="border-none shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-lg">Recent Sales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {stats.recentSales.length > 0 ? (
+                    stats.recentSales.map((sale) => renderRecentActivityItem(sale, TrendingUp, "text-green-500", "sale"))
+                  ) : (
+                    <EmptyState
+                      icon={TrendingUp}
+                      title="No recent sales"
+                      description="Orders from converted quotes will appear here."
+                      action={true}
+                      actionLabel="View Orders"
+                      onAction={() => window.location.href = '/orders'}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

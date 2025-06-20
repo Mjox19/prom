@@ -15,32 +15,59 @@ const Products = () => {
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    seedProducts();
     loadProducts();
   }, []);
 
-  const loadProducts = () => {
-    setProductsState(getProducts());
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      // Simulate loading delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      seedProducts();
+      setProductsState(getProducts());
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetCurrentProductState = () => {
     setSelectedProduct(null);
   };
 
-  const handleFormSubmit = (productData) => {
-    if (selectedProduct) {
-      updateProduct(selectedProduct.id, productData);
-      toast({ title: "Product updated", description: "The product has been successfully updated." });
-    } else {
-      addProduct(productData);
-      toast({ title: "Product added", description: "The product has been successfully added." });
+  const handleFormSubmit = async (productData) => {
+    try {
+      if (selectedProduct) {
+        updateProduct(selectedProduct.id, productData);
+        toast({ title: "Product updated", description: "The product has been successfully updated." });
+      } else {
+        addProduct(productData);
+        toast({ title: "Product added", description: "The product has been successfully added." });
+      }
+      
+      // Reload products to show updated data
+      await loadProducts();
+      setIsFormDialogOpen(false);
+      resetCurrentProductState();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save product. Please try again.",
+        variant: "destructive"
+      });
     }
-    loadProducts();
-    setIsFormDialogOpen(false);
-    resetCurrentProductState();
   };
 
   const openEditDialog = (product) => {
@@ -53,14 +80,28 @@ const Products = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDeleteProduct = () => {
+  const handleDeleteProduct = async () => {
     if (selectedProduct) {
-      deleteProduct(selectedProduct.id);
-      loadProducts();
-      setIsDeleteDialogOpen(false);
-      setSelectedProduct(null);
-      toast({ title: "Product deleted", description: "The product has been successfully deleted.", variant: "destructive" });
+      try {
+        deleteProduct(selectedProduct.id);
+        await loadProducts();
+        setIsDeleteDialogOpen(false);
+        setSelectedProduct(null);
+        toast({ title: "Product deleted", description: "The product has been successfully deleted.", variant: "destructive" });
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete product. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
+  };
+
+  const handleAddProduct = () => {
+    setSelectedProduct(null);
+    setIsFormDialogOpen(true);
   };
 
   const filteredProducts = products.filter(product => 
@@ -80,7 +121,7 @@ const Products = () => {
               if (!isOpen) resetCurrentProductState();
             }}>
               <DialogTrigger asChild>
-                <Button onClick={() => { setSelectedProduct(null); /* setIsFormDialogOpen(true) is handled by DialogTrigger */ }} className="bg-teal-600 hover:bg-teal-700">
+                <Button onClick={handleAddProduct} className="bg-teal-600 hover:bg-teal-700">
                   <Plus className="h-4 w-4 mr-2" /> Add Product
                 </Button>
               </DialogTrigger>
@@ -107,7 +148,13 @@ const Products = () => {
             </div>
           </div>
           
-          <ProductTable products={filteredProducts} onEdit={openEditDialog} onDelete={openDeleteDialog} />
+          <ProductTable 
+            products={filteredProducts} 
+            onEdit={openEditDialog} 
+            onDelete={openDeleteDialog}
+            loading={loading}
+            onAddProduct={handleAddProduct}
+          />
         </div>
       </div>
       

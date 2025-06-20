@@ -40,9 +40,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
@@ -99,16 +101,10 @@ const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm 
   };
   
   const handleSubmit = () => {
-    // Validate required fields
     const requiredFields = ['company_name', 'first_name', 'last_name', 'email'];
     const missingFields = requiredFields.filter(field => !formData[field]);
     
     if (missingFields.length > 0) {
-      toast({
-        title: "Required Fields Missing",
-        description: `Please fill in all required fields: ${missingFields.join(', ')}`,
-        variant: "destructive"
-      });
       return;
     }
 
@@ -380,13 +376,13 @@ const Customers = () => {
     try {
       setLoading(true);
       
-      // Check if Supabase is properly configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+      if (!isSupabaseConfigured) {
         // Use demo data when Supabase is not configured
         console.log('Using demo data - Supabase not configured');
+        
+        // Simulate loading delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setCustomers([
           {
             id: '1',
@@ -502,11 +498,7 @@ const Customers = () => {
 
   const handleCreateSubmit = async (formData) => {
     try {
-      // Check if Supabase is properly configured
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+      if (!isSupabaseConfigured) {
         // Demo mode - just add to local state
         const newCustomer = {
           id: Date.now().toString(),
@@ -553,11 +545,7 @@ const Customers = () => {
   const handleEditSubmit = async (formData) => {
     if (selectedCustomer) {
       try {
-        // Check if Supabase is properly configured
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+        if (!isSupabaseConfigured) {
           // Demo mode - just update local state
           setCustomers(prev => prev.map(customer => 
             customer.id === selectedCustomer.id 
@@ -608,11 +596,7 @@ const Customers = () => {
   const handleDeleteCustomer = async () => {
     if (selectedCustomer) {
       try {
-        // Check if Supabase is properly configured
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+        if (!isSupabaseConfigured) {
           // Demo mode - just remove from local state
           setCustomers(prev => prev.filter(customer => customer.id !== selectedCustomer.id));
           setIsDeleteDialogOpen(false);
@@ -661,6 +645,10 @@ const Customers = () => {
     setIsViewDialogOpen(true);
   };
 
+  const handleAddCustomer = () => {
+    setIsCreateDialogOpen(true);
+  };
+
   const filteredCustomers = customers.filter(customer => 
     Object.values(customer).some(val => 
       String(val).toLowerCase().includes(searchTerm.toLowerCase())
@@ -670,17 +658,6 @@ const Customers = () => {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}};
 
-  if (loading) {
-    return (
-      <div className="h-full flex flex-col">
-        <Header title="Customer Management" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex flex-col">
       <Header title="Customer Management" />
@@ -689,7 +666,7 @@ const Customers = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-purple-600 hover:bg-purple-700">
+                <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleAddCustomer}>
                   <Plus className="h-4 w-4 mr-2" />Add Customer
                 </Button>
               </DialogTrigger>
@@ -700,23 +677,42 @@ const Customers = () => {
             </div>
           </div>
           
-          <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          {loading ? (
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Country</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCustomers.length > 0 ? (
-                      filteredCustomers.map((customer) => (
+                <TableSkeleton rows={5} columns={6} />
+              </CardContent>
+            </Card>
+          ) : filteredCustomers.length === 0 ? (
+            <Card className="border-none shadow-sm">
+              <CardContent className="p-0">
+                <EmptyState
+                  icon={Users}
+                  title="No customers found"
+                  description="Add your first customer to get started. You can manage customer information, track their quotes and orders, and build lasting business relationships."
+                  action={true}
+                  actionLabel="Add Customer"
+                  onAction={handleAddCustomer}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <motion.div variants={containerVariants} initial="hidden" animate="visible">
+              <Card className="border-none shadow-sm">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Country</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCustomers.map((customer) => (
                         <motion.tr key={customer.id} variants={itemVariants} className="border-b transition-colors hover:bg-gray-50">
                           <TableCell className="font-medium">
                             <div className="flex items-center">
@@ -762,19 +758,13 @@ const Customers = () => {
                             </div>
                           </TableCell>
                         </motion.tr>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                          {loading ? "Loading customers..." : "No customers found. Add your first customer to get started."}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </motion.div>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
       </div>
       
