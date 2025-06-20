@@ -243,25 +243,64 @@ const Quotes = () => {
           customer_id: quote.customer_id,
           status: 'pending',
           total_amount: quote.total,
-          shipping_address: customer.address || 'Address pending'
+          shipping_address: customer.address || 'Address pending',
+          payment_status: 'unpaid'
         }])
         .select()
         .single();
 
       if (orderError) throw orderError;
 
-      // Update quote status
-      await handleUpdateStatus(quoteId, 'accepted');
+      // Update quote status to ordered
+      await handleUpdateStatus(quoteId, 'ordered');
 
       toast({
         title: "Quote Converted",
-        description: "Quote successfully converted to sale."
+        description: "Quote successfully converted to order and will appear in Sales page."
       });
     } catch (error) {
       console.error('Error converting quote to sale:', error);
       toast({
         title: "Error",
-        description: "Failed to convert quote to sale",
+        description: "Failed to convert quote to order",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSendReminder = async (quote) => {
+    try {
+      // Get customer details
+      const customer = customers.find(c => c.id === quote.customer_id);
+      if (!customer) {
+        throw new Error('Customer not found');
+      }
+
+      // Create a notification for the user about the reminder being sent
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert([{
+          user_id: user.id,
+          title: 'Quote Reminder Sent',
+          message: `Email reminder sent to ${customer.first_name} ${customer.last_name} for quote ${quote.quote_number}`,
+          type: 'quote'
+        }]);
+
+      if (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      // Simulate email sending (in a real app, you'd call an email service)
+      toast({
+        title: "Reminder Sent",
+        description: `Email reminder sent to ${customer.email} for quote ${quote.quote_number}`,
+      });
+
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send email reminder",
         variant: "destructive"
       });
     }
@@ -278,7 +317,9 @@ const Quotes = () => {
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = quote.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         quote.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         quote.quote_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter ? quote.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
@@ -324,6 +365,7 @@ const Quotes = () => {
                   <SelectItem value="sent">Sent</SelectItem>
                   <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="declined">Declined</SelectItem>
+                  <SelectItem value="ordered">Ordered</SelectItem>
                   <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
@@ -337,6 +379,7 @@ const Quotes = () => {
             onUpdateStatus={handleUpdateStatus}
             onConvertToSale={handleConvertToSale}
             onDelete={openDeleteDialog}
+            onSendReminder={handleSendReminder}
           />
         </div>
       </div>

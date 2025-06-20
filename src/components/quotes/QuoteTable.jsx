@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,28 @@ const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale
   const getCustomerName = (customerId) => {
     const customer = customers.find(c => c.id === customerId);
     return customer ? `${customer.first_name} ${customer.last_name} - ${customer.company_name}` : "Unknown";
+  };
+
+  const handleStatusChange = (quoteId, newStatus) => {
+    onUpdateStatus(quoteId, newStatus);
+    
+    // If status is changed to "ordered", automatically convert to sale
+    if (newStatus === 'ordered') {
+      onConvertToSale(quoteId);
+    }
+  };
+
+  const getStatusOptions = (currentStatus) => {
+    const allStatuses = [
+      { value: 'draft', label: 'Draft' },
+      { value: 'sent', label: 'Sent' },
+      { value: 'accepted', label: 'Accepted' },
+      { value: 'declined', label: 'Declined' },
+      { value: 'ordered', label: 'Ordered' },
+      { value: 'expired', label: 'Expired' }
+    ];
+    
+    return allStatuses;
   };
 
   return (
@@ -56,27 +79,33 @@ const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale
                       </div>
                     </TableCell>
                     <TableCell>${quote.total?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                    <TableCell><span className={`status-badge status-${quote.status}`}>{quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}</span></TableCell>
+                    <TableCell>
+                      <Select
+                        value={quote.status}
+                        onValueChange={(value) => handleStatusChange(quote.id, value)}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue>
+                            <span className={`status-badge status-${quote.status}`}>
+                              {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                            </span>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getStatusOptions(quote.status).map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => onEdit(quote)} title="Edit Quote">
                           <Edit className="h-4 w-4 text-amber-500" />
                         </Button>
-                        {quote.status === 'draft' && (
-                          <Button variant="ghost" size="icon" onClick={() => onUpdateStatus(quote.id, 'sent')} title="Send">
-                            <Send className="h-4 w-4 text-blue-500" />
-                          </Button>
-                        )}
-                        {quote.status === 'sent' && (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={() => onUpdateStatus(quote.id, 'accepted')} title="Accept">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => onUpdateStatus(quote.id, 'declined')} title="Decline">
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </>
-                        )}
+                        
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -84,16 +113,16 @@ const QuoteTable = ({ quotes, customers, onEdit, onUpdateStatus, onConvertToSale
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {(quote.status === 'sent' || quote.status === 'accepted') && (
+                              <DropdownMenuItem onClick={() => onSendReminder(quote)}>
+                                <Bell className="h-4 w-4 mr-2" />
+                                Send Email Reminder
+                              </DropdownMenuItem>
+                            )}
                             {quote.status === 'accepted' && (
                               <DropdownMenuItem onClick={() => onConvertToSale(quote.id)}>
                                 <ShoppingCart className="h-4 w-4 mr-2" />
-                                Convert to Sale
-                              </DropdownMenuItem>
-                            )}
-                            {quote.status === 'sent' && (
-                              <DropdownMenuItem onClick={() => onSendReminder(quote)}>
-                                <Bell className="h-4 w-4 mr-2" />
-                                Send Reminder
+                                Convert to Order
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={() => onDelete(quote)} className="text-red-600">
