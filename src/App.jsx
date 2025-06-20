@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import Dashboard from '@/pages/Dashboard';
@@ -12,8 +12,23 @@ import Login from '@/pages/Login';
 import AuthGuard from '@/components/AuthGuard';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { deliveryScheduler } from '@/lib/deliveryScheduler';
+import { notificationService } from '@/lib/notificationService';
 
 function App() {
+  useEffect(() => {
+    // Request notification permission when app loads
+    notificationService.requestNotificationPermission();
+    
+    // Start the delivery scheduler
+    deliveryScheduler.start();
+    
+    // Cleanup on unmount
+    return () => {
+      deliveryScheduler.stop();
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
@@ -35,7 +50,7 @@ function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="settings" element={<Settings />} />
           </Route>
-          <Route path="*" element={<Navigate to="/\" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />
       </Router>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
-  Package, Truck, MapPin, Clock, AlertTriangle
+  Package, Truck, MapPin, Clock, AlertTriangle, Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { notificationService } from "@/lib/notificationService";
 
 const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSubmit }) => {
   const [formData, setFormData] = useState({
@@ -32,11 +33,11 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
     if (order) {
       setFormData({
         customerId: order.customer_id,
-        items: order.items.map(item => ({
+        items: order.items?.map(item => ({
           productName: item.product_name,
           description: item.product_description,
           quantity: item.quantity
-        })),
+        })) || [{ productName: "", description: "", quantity: 1 }],
         shippingAddress: order.shipping_address,
         carrier: order.delivery && order.delivery.length > 0 ? order.delivery[0].carrier : "fedex"
       });
@@ -209,13 +210,21 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
       loadData();
-      subscribeToOrders();
+      
+      // Request notification permission
+      notificationService.requestNotificationPermission();
+      
+      // Subscribe to real-time changes if Supabase is configured
+      if (isSupabaseConfigured) {
+        subscribeToOrders();
+      }
     }
   }, [user]);
 
@@ -228,18 +237,10 @@ const Orders = () => {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setOrders(prev => [payload.new, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setOrders(prev =>
-              prev.map(order => order.id === payload.new.id ? payload.new : order)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setOrders(prev => prev.filter(order => order.id !== payload.old.id));
-          }
+          console.log('Orders changed:', payload);
+          loadData();
         }
       )
       .subscribe();
@@ -251,7 +252,44 @@ const Orders = () => {
 
   const loadData = async () => {
     try {
-      // Fetch orders with their delivery information for the current user
+      setLoading(true);
+
+      if (!isSupabaseConfigured) {
+        // Use demo data when Supabase is not configured
+        console.log('Using demo data - Supabase not configured');
+        setOrders([
+          {
+            id: '1',
+            customer_id: '1',
+            status: 'pending',
+            total_amount: 5000,
+            shipping_address: '123 Demo St, Demo City, DC 12345',
+            tracking_number: 'DEMO123456',
+            created_at: new Date().toISOString(),
+            items: [
+              { id: '1', product_name: 'Demo Product', product_description: 'Demo Description', quantity: 2 }
+            ],
+            delivery: [
+              { id: '1', status: 'pending', carrier: 'fedex', estimated_delivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() }
+            ]
+          }
+        ]);
+        
+        setCustomers([
+          {
+            id: '1',
+            company_name: 'Demo Company',
+            first_name: 'Demo',
+            last_name: 'Customer',
+            email: 'demo@example.com'
+          }
+        ]);
+        
+        setLoading(false);
+        return;
+      }
+
+      // Fetch orders with their delivery information and customer details
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
@@ -264,22 +302,22 @@ const Orders = () => {
             unit_price,
             total_price
           ),
-          delivery:deliveries(*)
+          delivery:deliveries(*),
+          customer:customers(*)
         `)
-        .eq('user_id', user.id)  // Changed from customer_id to user_id
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
-      setOrders(ordersData);
+      setOrders(ordersData || []);
 
-      // Fetch customers owned by the current user
+      // Fetch all customers for the form dropdown
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select('*')
-        .eq('user_id', user.id);
+        .order('company_name', { ascending: true });
 
       if (customersError) throw customersError;
-      setCustomers(customersData);
+      setCustomers(customersData || []);
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -288,11 +326,45 @@ const Orders = () => {
         description: "Failed to load orders. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleCreateOrder = async (formData) => {
     try {
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        const newOrder = {
+          id: Date.now().toString(),
+          customer_id: formData.customerId,
+          status: 'pending',
+          total_amount: 0,
+          shipping_address: formData.shippingAddress,
+          created_at: new Date().toISOString(),
+          items: formData.items.map((item, index) => ({
+            id: `${Date.now()}-${index}`,
+            product_name: item.productName,
+            product_description: item.description,
+            quantity: item.quantity
+          })),
+          delivery: [{
+            id: `del-${Date.now()}`,
+            status: 'pending',
+            carrier: formData.carrier,
+            estimated_delivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          }]
+        };
+        
+        setOrders(prev => [newOrder, ...prev]);
+        setIsFormDialogOpen(false);
+        toast({
+          title: "Order Created (Demo Mode)",
+          description: "New order has been created in demo data."
+        });
+        return;
+      }
+
       // Calculate prices based on quantity
       const orderItems = formData.items.map(item => ({
         product_name: item.productName,
@@ -304,12 +376,12 @@ const Orders = () => {
 
       const totalAmount = 0; // Calculate based on your business logic
 
-      // Create order with user_id
+      // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert([{
           customer_id: formData.customerId,
-          user_id: user.id, // Associate the order with the current user
+          user_id: user.id,
           status: 'pending',
           total_amount: totalAmount,
           shipping_address: formData.shippingAddress
@@ -343,6 +415,19 @@ const Orders = () => {
 
       if (deliveryError) throw deliveryError;
 
+      // Get customer for notification
+      const customer = customers.find(c => c.id === formData.customerId);
+      if (customer) {
+        // Send order creation notification
+        await notificationService.handleOrderStatusChange(
+          order,
+          'created',
+          'pending',
+          customer,
+          user
+        );
+      }
+
       setIsFormDialogOpen(false);
       toast({
         title: "Order Created",
@@ -360,12 +445,45 @@ const Orders = () => {
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const oldStatus = order.status;
+
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        setOrders(prev => prev.map(o => 
+          o.id === orderId 
+            ? { ...o, status: newStatus, updated_at: new Date().toISOString() }
+            : o
+        ));
+        
+        toast({
+          title: "Status Updated (Demo Mode)",
+          description: `Order status updated to ${newStatus} in demo data.`
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Get customer for notification
+      const customer = order.customer || customers.find(c => c.id === order.customer_id);
+      if (customer && oldStatus !== newStatus) {
+        // Send status change notification
+        await notificationService.handleOrderStatusChange(
+          order,
+          oldStatus,
+          newStatus,
+          customer,
+          user
+        );
+      }
 
       toast({
         title: "Status Updated",
@@ -383,6 +501,15 @@ const Orders = () => {
 
   const handleUpdateDeliveryStatus = async (deliveryId, newStatus) => {
     try {
+      if (!isSupabaseConfigured) {
+        // Demo mode
+        toast({
+          title: "Delivery Updated (Demo Mode)",
+          description: `Delivery status updated to ${newStatus} in demo data.`
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('deliveries')
         .update({ 
@@ -402,6 +529,36 @@ const Orders = () => {
       toast({
         title: "Error",
         description: "Failed to update delivery status.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSendDeliveryReminder = async (order) => {
+    try {
+      const delivery = order.delivery?.[0];
+      const customer = order.customer || customers.find(c => c.id === order.customer_id);
+      
+      if (!delivery || !customer) {
+        toast({
+          title: "Error",
+          description: "Missing delivery or customer information.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await notificationService.handleDeliveryReminder(delivery, order, customer, user);
+      
+      toast({
+        title: "Reminder Sent",
+        description: `Delivery reminder sent to ${customer.email}`,
+      });
+    } catch (error) {
+      console.error('Error sending delivery reminder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send delivery reminder.",
         variant: "destructive"
       });
     }
@@ -429,6 +586,25 @@ const Orders = () => {
     return customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : 'Unknown';
   };
 
+  const isDeliveryUpcoming = (delivery) => {
+    if (!delivery?.estimated_delivery) return false;
+    const deliveryDate = new Date(delivery.estimated_delivery);
+    const fiveDaysFromNow = new Date();
+    fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
+    const today = new Date();
+    return deliveryDate >= today && deliveryDate <= fiveDaysFromNow;
+  };
+
+  const filteredOrders = orders.filter(order => {
+    const customer = order.customer || customers.find(c => c.id === order.customer_id);
+    const customerName = customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : '';
+    
+    const matchesSearch = customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter ? order.status === statusFilter : true;
+    return matchesSearch && matchesStatus;
+  });
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.05 }}
@@ -438,6 +614,17 @@ const Orders = () => {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}
   };
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col">
+        <Header title="Orders & Deliveries" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -498,107 +685,125 @@ const Orders = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.length > 0 ? (
-                      orders.map((order) => (
-                        <motion.tr
-                          key={order.id}
-                          variants={itemVariants}
-                          className="border-b hover:bg-gray-50"
-                        >
-                          <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <Package className="h-4 w-4 text-purple-500 mr-2" />
-                              #{order.id.slice(0, 8)}
-                            </div>
-                          </TableCell>
-                          <TableCell>{getCustomerName(order.customer_id)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              {getStatusIcon(order.status)}
-                              <span className={`status-badge status-${order.status}`}>
-                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {order.delivery && order.delivery.length > 0 ? (
+                    {filteredOrders.length > 0 ? (
+                      filteredOrders.map((order) => {
+                        const delivery = order.delivery?.[0];
+                        const isUpcoming = delivery && isDeliveryUpcoming(delivery);
+                        
+                        return (
+                          <motion.tr
+                            key={order.id}
+                            variants={itemVariants}
+                            className="border-b hover:bg-gray-50"
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center">
+                                <Package className="h-4 w-4 text-purple-500 mr-2" />
+                                #{order.id.slice(0, 8)}
+                                {isUpcoming && (
+                                  <Bell className="h-4 w-4 text-amber-500 ml-2" title="Delivery upcoming in 5 days" />
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{getCustomerName(order.customer_id)}</TableCell>
+                            <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Truck className="h-4 w-4 text-blue-500" />
-                                <span className={`status-badge status-${order.delivery[0].status}`}>
-                                  {(order.delivery[0].status || '').split('_').map(word => 
-                                    word.charAt(0).toUpperCase() + word.slice(1)
-                                  ).join(' ')}
+                                {getStatusIcon(order.status)}
+                                <span className={`status-badge status-${order.status}`}>
+                                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-gray-500">No delivery info</span>
-                            )}
-                          </TableCell>
-                          <TableCell>${order.total_amount.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center text-gray-500">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(order.created_at).toLocaleDateString()}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-1">
-                              {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                                <>
-                                  {order.status === 'pending' && (
+                            </TableCell>
+                            <TableCell>
+                              {delivery ? (
+                                <div className="flex items-center space-x-2">
+                                  <Truck className="h-4 w-4 text-blue-500" />
+                                  <span className={`status-badge status-${delivery.status}`}>
+                                    {(delivery.status || '').split('_').map(word => 
+                                      word.charAt(0).toUpperCase() + word.slice(1)
+                                    ).join(' ')}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-500">No delivery info</span>
+                              )}
+                            </TableCell>
+                            <TableCell>${order.total_amount?.toLocaleString() || '0'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center text-gray-500">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-1">
+                                {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                  <>
+                                    {order.status === 'pending' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'processing')}
+                                        title="Start Processing"
+                                      >
+                                        <Package className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                    )}
+                                    {order.status === 'processing' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'shipped')}
+                                        title="Mark as Shipped"
+                                      >
+                                        <Truck className="h-4 w-4 text-purple-500" />
+                                      </Button>
+                                    )}
+                                    {order.status === 'shipped' && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
+                                        title="Mark as Delivered"
+                                      >
+                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => handleUpdateOrderStatus(order.id, 'processing')}
-                                      title="Start Processing"
+                                      onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                                      title="Cancel Order"
                                     >
-                                      <Package className="h-4 w-4 text-blue-500" />
+                                      <XCircle className="h-4 w-4 text-red-500" />
                                     </Button>
-                                  )}
-                                  {order.status === 'processing' && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleUpdateOrderStatus(order.id, 'shipped')}
-                                      title="Mark as Shipped"
-                                    >
-                                      <Truck className="h-4 w-4 text-purple-500" />
-                                    </Button>
-                                  )}
-                                  {order.status === 'shipped' && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
-                                      title="Mark as Delivered"
-                                    >
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                  )}
+                                  </>
+                                )}
+                                {delivery && delivery.status !== 'delivered' && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                                    title="Cancel Order"
+                                    onClick={() => handleUpdateDeliveryStatus(delivery.id, 'delivered')}
+                                    title="Mark Delivery as Complete"
                                   >
-                                    <XCircle className="h-4 w-4 text-red-500" />
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
                                   </Button>
-                                </>
-                              )}
-                              {order.delivery && order.delivery.length > 0 && order.delivery[0].status !== 'delivered' && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleUpdateDeliveryStatus(order.delivery[0].id, 'delivered')}
-                                  title="Mark Delivery as Complete"
-                                >
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </motion.tr>
-                      ))
+                                )}
+                                {delivery && isUpcoming && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleSendDeliveryReminder(order)}
+                                    title="Send Delivery Reminder"
+                                  >
+                                    <Bell className="h-4 w-4 text-amber-500" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </motion.tr>
+                        );
+                      })
                     ) : (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8 text-gray-500">
