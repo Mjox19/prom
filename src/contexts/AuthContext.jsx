@@ -1,4 +1,3 @@
-// Current content of src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -8,77 +7,28 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const ensureProfile = async (user) => {
-    if (!user) return;
-
-    try {
-      // Check if profile record exists - using maybeSingle() instead of single()
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!existingProfile) {
-        // Create new profile record if none exists
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: user.id,
-            email: user.email,
-            first_name: user.email.split('@')[0], // Default first name from email
-            last_name: '', // Empty last name
-            avatar_url: null,
-            bio: '', // Required but can be empty
-            role: 'user' // Default role
-          }]);
-
-        if (insertError) {
-          console.error('Error creating profile record:', insertError);
-          // If profile creation fails, sign out the user
-          await supabase.auth.signOut();
-          setUser(null);
-          return;
-        }
-
-        // --- REMOVE THIS BLOCK: Notification preferences are handled by DB trigger ---
-        // Create default notification preferences using service role client
-        // const { data: { session } } = await supabase.auth.getSession();
-        // if (session?.access_token) {
-        //   const { error: prefError } = await supabase
-        //     .from('notification_preferences')
-        //     .insert([{
-        //       user_id: user.id,
-        //       // Default values are handled by the database
-        //     }], {
-        //       headers: {
-        //         Authorization: `Bearer ${session.access_token}`
-        //       }
-        //     });
-
-        //   if (prefError) {
-        //     console.error('Error creating notification preferences:', prefError);
-        //   }
-        // }
-        // --- END REMOVAL BLOCK ---
-
-      }
-    } catch (error) {
-      console.error('Error ensuring profile record exists:', error);
-      // If there's an error, sign out the user
-      await supabase.auth.signOut();
-      setUser(null);
-    }
-  };
-
   useEffect(() => {
+    // Check if Supabase is properly configured
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+      // Use demo user when Supabase is not configured
+      console.log('Supabase not configured, using demo user');
+      setUser({
+        id: '00000000-0000-0000-0000-000000000000',
+        email: 'demo@example.com',
+        first_name: 'Demo',
+        last_name: 'User'
+      });
+      setLoading(false);
+      return;
+    }
+
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) {
-        ensureProfile(currentUser);
-      }
       setLoading(false);
     });
 
@@ -86,9 +36,6 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) {
-        await ensureProfile(currentUser);
-      }
       setLoading(false);
     });
 
@@ -98,16 +45,10 @@ export const AuthProvider = ({ children }) => {
   const value = {
     signUp: async (data) => {
       const response = await supabase.auth.signUp(data);
-      if (response.data.user) {
-        await ensureProfile(response.data.user);
-      }
       return response;
     },
     signIn: async (data) => {
       const response = await supabase.auth.signInWithPassword(data);
-      if (response.data.user) {
-        await ensureProfile(response.data.user);
-      }
       return response;
     },
     signOut: () => supabase.auth.signOut(),
