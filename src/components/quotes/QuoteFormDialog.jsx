@@ -148,18 +148,6 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
             />
           </div>
         )}
-
-        <div className="space-y-2">
-          <Label htmlFor="title" className="required">Quote Title</Label>
-          <Input
-            id="title"
-            value={newQuote.title}
-            onChange={(e) => setNewQuote({...newQuote, title: e.target.value})}
-            placeholder="Enter quote title"
-            required
-          />
-        </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="customer">Customer</Label>
