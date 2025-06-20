@@ -42,8 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
-import { getCustomers, getCustomerById, addCustomer, updateCustomer, deleteCustomer } from "@/lib/customerData";
-import { seedData } from "@/lib/data";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CustomerFormDialog = ({ open, onOpenChange, customer, onSubmit, resetForm }) => {
@@ -367,68 +366,175 @@ const Customers = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
-    // Seed and load customers data
-    seedData();
-    loadData();
-  }, []);
+    if (user) {
+      loadData();
+    }
+  }, [user]);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
-      // Get customers from localStorage
-      const customersData = getCustomers();
+      setLoading(true);
       
-      // For demo purposes, create some mock quotes and orders related to customers
-      const mockQuotes = [];
-      const mockOrders = [];
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
-      // Create some mock quotes and orders for each customer
-      customersData.forEach(customer => {
-        // Add 0-2 quotes per customer
-        const quoteCount = Math.floor(Math.random() * 3);
-        for (let i = 0; i < quoteCount; i++) {
-          mockQuotes.push({
-            id: `quote-${customer.id}-${i}`,
-            customer_id: customer.id,
-            title: `Quote #${i+1} for ${customer.company_name}`,
-            status: ['draft', 'sent', 'accepted', 'rejected'][Math.floor(Math.random() * 4)],
-            amount: Math.floor(Math.random() * 10000) + 1000
-          });
-        }
-        
-        // Add 0-2 orders per customer
-        const orderCount = Math.floor(Math.random() * 3);
-        for (let i = 0; i < orderCount; i++) {
-          mockOrders.push({
-            id: `order-${customer.id}-${i}`,
-            customer_id: customer.id,
-            title: `Order #${i+1} from ${customer.company_name}`,
-            status: ['processing', 'shipped', 'delivered', 'cancelled'][Math.floor(Math.random() * 4)],
-            amount: Math.floor(Math.random() * 8000) + 2000
-          });
-        }
-      });
+      if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+        // Use demo data when Supabase is not configured
+        console.log('Using demo data - Supabase not configured');
+        setCustomers([
+          {
+            id: '1',
+            company_name: 'Acme Corporation',
+            first_name: 'John',
+            last_name: 'Smith',
+            email: 'john@acme.com',
+            phone: '555-123-4567',
+            country: 'United States',
+            address: '123 Business Ave, Suite 100, New York, NY 10001',
+            contact_language: 'english',
+            customer_type: 'end_client',
+            bio: 'Large enterprise client with multiple departments'
+          },
+          {
+            id: '2',
+            company_name: 'TechStart Inc.',
+            first_name: 'Sarah',
+            last_name: 'Johnson',
+            email: 'sarah@techstart.io',
+            phone: '555-987-6543',
+            country: 'United States',
+            address: '456 Innovation Blvd, San Francisco, CA 94107',
+            contact_language: 'english',
+            customer_type: 'end_client',
+            bio: 'Startup with rapid growth, interested in premium services'
+          },
+          {
+            id: '3',
+            company_name: 'Global Retail Solutions',
+            first_name: 'Michael',
+            last_name: 'Chen',
+            email: 'michael@globalretail.com',
+            phone: '555-456-7890',
+            country: 'United States',
+            address: '789 Commerce St, Chicago, IL 60611',
+            contact_language: 'english',
+            customer_type: 'reseller',
+            bio: 'Retail chain looking for enterprise solutions'
+          }
+        ]);
+        setQuotes([]);
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
 
-      setCustomers(customersData);
-      setQuotes(mockQuotes);
-      setOrders(mockOrders);
+      // Get all customers (RLS is disabled, so we get all customers)
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (customersError) {
+        console.error('Error fetching customers:', customersError);
+        throw customersError;
+      }
+
+      // Get quotes for activity display
+      const { data: quotesData, error: quotesError } = await supabase
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (quotesError) {
+        console.error('Error fetching quotes:', quotesError);
+      }
+
+      // Get orders for activity display
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+      }
+
+      setCustomers(customersData || []);
+      setQuotes(quotesData || []);
+      setOrders(ordersData || []);
+
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
         title: "Error",
-        description: "Failed to load customer data",
+        description: "Failed to load customer data. Using demo data instead.",
         variant: "destructive"
       });
+      
+      // Fallback to demo data
+      setCustomers([
+        {
+          id: '1',
+          company_name: 'Demo Company',
+          first_name: 'Demo',
+          last_name: 'Customer',
+          email: 'demo@example.com',
+          phone: '555-000-0000',
+          country: 'Demo Country',
+          address: 'Demo Address',
+          contact_language: 'english',
+          customer_type: 'end_client',
+          bio: 'Demo customer for testing'
+        }
+      ]);
+      setQuotes([]);
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCreateSubmit = (formData) => {
+  const handleCreateSubmit = async (formData) => {
     try {
-      const newCustomer = addCustomer(formData);
-      loadData();
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+        // Demo mode - just add to local state
+        const newCustomer = {
+          id: Date.now().toString(),
+          ...formData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setCustomers(prev => [newCustomer, ...prev]);
+        setIsCreateDialogOpen(false);
+        toast({ 
+          title: "Customer Created (Demo Mode)", 
+          description: "The customer has been added to demo data." 
+        });
+        return;
+      }
+
+      const { data: newCustomer, error } = await supabase
+        .from('customers')
+        .insert([{
+          ...formData,
+          user_id: user.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCustomers(prev => [newCustomer, ...prev]);
       setIsCreateDialogOpen(false);
       toast({ 
         title: "Customer Created", 
@@ -444,11 +550,44 @@ const Customers = () => {
     }
   };
 
-  const handleEditSubmit = (formData) => {
+  const handleEditSubmit = async (formData) => {
     if (selectedCustomer) {
       try {
-        const updatedCustomer = updateCustomer(selectedCustomer.id, formData);
-        loadData();
+        // Check if Supabase is properly configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+          // Demo mode - just update local state
+          setCustomers(prev => prev.map(customer => 
+            customer.id === selectedCustomer.id 
+              ? { ...customer, ...formData, updated_at: new Date().toISOString() }
+              : customer
+          ));
+          setIsEditDialogOpen(false);
+          setSelectedCustomer(null);
+          toast({ 
+            title: "Customer Updated (Demo Mode)", 
+            description: "The customer has been updated in demo data." 
+          });
+          return;
+        }
+
+        const { data: updatedCustomer, error } = await supabase
+          .from('customers')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedCustomer.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setCustomers(prev => prev.map(customer => 
+          customer.id === selectedCustomer.id ? updatedCustomer : customer
+        ));
         setIsEditDialogOpen(false);
         setSelectedCustomer(null);
         toast({ 
@@ -466,11 +605,34 @@ const Customers = () => {
     }
   };
 
-  const handleDeleteCustomer = () => {
+  const handleDeleteCustomer = async () => {
     if (selectedCustomer) {
       try {
-        deleteCustomer(selectedCustomer.id);
-        loadData();
+        // Check if Supabase is properly configured
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+          // Demo mode - just remove from local state
+          setCustomers(prev => prev.filter(customer => customer.id !== selectedCustomer.id));
+          setIsDeleteDialogOpen(false);
+          setSelectedCustomer(null);
+          toast({ 
+            title: "Customer Deleted (Demo Mode)", 
+            description: "The customer has been removed from demo data.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+
+        const { error } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', selectedCustomer.id);
+
+        if (error) throw error;
+
+        setCustomers(prev => prev.filter(customer => customer.id !== selectedCustomer.id));
         setIsDeleteDialogOpen(false);
         setSelectedCustomer(null);
         toast({ 
@@ -507,6 +669,17 @@ const Customers = () => {
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}};
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col">
+        <Header title="Customer Management" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -566,13 +739,13 @@ const Customers = () => {
                           <TableCell>
                             <div className="flex items-center">
                               <Phone className="h-4 w-4 text-gray-400 mr-2" />
-                              {customer.phone}
+                              {customer.phone || 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center">
                               <Globe className="h-4 w-4 text-gray-400 mr-2" />
-                              {customer.country}
+                              {customer.country || 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
@@ -592,7 +765,9 @@ const Customers = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">No customers found.</TableCell>
+                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                          {loading ? "Loading customers..." : "No customers found. Add your first customer to get started."}
+                        </TableCell>
                       </TableRow>
                     )}
                   </TableBody>

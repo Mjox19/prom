@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const AuthContext = createContext({});
 
@@ -8,13 +8,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if Supabase is properly configured
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+    if (!isSupabaseConfigured) {
       // Use demo user when Supabase is not configured
-      console.log('Supabase not configured, using demo user');
+      console.log('Using demo user - Supabase not configured');
       setUser({
         id: '00000000-0000-0000-0000-000000000000',
         email: 'demo@example.com',
@@ -44,14 +40,25 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     signUp: async (data) => {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase not configured');
+      }
       const response = await supabase.auth.signUp(data);
       return response;
     },
     signIn: async (data) => {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase not configured');
+      }
       const response = await supabase.auth.signInWithPassword(data);
       return response;
     },
-    signOut: () => supabase.auth.signOut(),
+    signOut: () => {
+      if (!isSupabaseConfigured) {
+        return Promise.resolve();
+      }
+      return supabase.auth.signOut();
+    },
     user,
     loading
   };
