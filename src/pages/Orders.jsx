@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
-  Package, Truck, MapPin, Clock, AlertTriangle, Bell
+  Package, Truck, MapPin, Clock, AlertTriangle, Bell, ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -22,56 +26,62 @@ import { useAuth } from "@/contexts/AuthContext";
 import { notificationService } from "@/lib/notificationService";
 
 const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSubmit }) => {
-  const [formData, setFormData] = useState({
-    customerId: "",
-    items: [{ productName: "", description: "", quantity: 1 }],
-    shippingAddress: "",
-    carrier: "fedex"
-  });
+  const initialValues = {
+    customerId: order?.customer_id || "",
+    items: order?.items?.map(item => ({
+      productName: item.product_name || "",
+      description: item.product_description || "",
+      quantity: item.quantity || 1
+    })) || [{ productName: "", description: "", quantity: 1 }],
+    shippingAddress: order?.shipping_address || "",
+    carrier: order?.delivery && order.delivery.length > 0 ? order.delivery[0].carrier : "fedex"
+  };
+
+  const rules = {
+    customerId: [validationRules.required],
+    shippingAddress: [validationRules.required]
+  };
+
+  const {
+    values,
+    errors,
+    touched,
+    setValue,
+    setTouched: setFieldTouched,
+    validateAll,
+    reset,
+    isValid
+  } = useFormValidation(initialValues, rules);
 
   useEffect(() => {
     if (order) {
-      setFormData({
-        customerId: order.customer_id,
-        items: order.items?.map(item => ({
-          productName: item.product_name,
-          description: item.product_description,
-          quantity: item.quantity
-        })) || [{ productName: "", description: "", quantity: 1 }],
-        shippingAddress: order.shipping_address,
-        carrier: order.delivery && order.delivery.length > 0 ? order.delivery[0].carrier : "fedex"
+      Object.keys(initialValues).forEach(key => {
+        setValue(key, initialValues[key]);
       });
     } else {
-      setFormData({
-        customerId: "",
-        items: [{ productName: "", description: "", quantity: 1 }],
-        shippingAddress: "",
-        carrier: "fedex"
-      });
+      reset();
     }
   }, [order, open]);
 
   const handleAddItem = () => {
-    setFormData(prev => ({
-      ...prev,
-      items: [...prev.items, { productName: "", description: "", quantity: 1 }]
-    }));
+    setValue("items", [...values.items, { productName: "", description: "", quantity: 1 }]);
   };
 
   const handleRemoveItem = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
+    setValue("items", values.items.filter((_, i) => i !== index));
   };
 
   const handleItemChange = (index, field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }));
+    const updatedItems = values.items.map((item, i) => 
+      i === index ? { ...item, [field]: value } : item
+    );
+    setValue("items", updatedItems);
+  };
+
+  const handleSubmit = () => {
+    if (validateAll()) {
+      onSubmit(values);
+    }
   };
 
   const carriers = [
@@ -83,7 +93,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{order ? "Edit Order" : "Create New Order"}</DialogTitle>
           <DialogDescription>
@@ -91,14 +101,21 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Customer</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ValidatedInput
+              label="Customer"
+              required
+              error={touched.customerId && errors.customerId}
+              success={touched.customerId && !errors.customerId && values.customerId}
+            >
               <Select
-                value={formData.customerId}
-                onValueChange={(value) => setFormData({...formData, customerId: value})}
+                value={values.customerId}
+                onValueChange={(value) => {
+                  setValue("customerId", value);
+                  setFieldTouched("customerId");
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={touched.customerId && errors.customerId ? "border-red-500" : ""}>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -109,12 +126,12 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Carrier</Label>
+            </ValidatedInput>
+            
+            <ValidatedInput label="Carrier">
               <Select
-                value={formData.carrier}
-                onValueChange={(value) => setFormData({...formData, carrier: value})}
+                value={values.carrier}
+                onValueChange={(value) => setValue("carrier", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select carrier" />
@@ -127,17 +144,23 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </ValidatedInput>
           </div>
 
-          <div className="space-y-2">
-            <Label>Shipping Address</Label>
+          <ValidatedInput
+            label="Shipping Address"
+            required
+            error={touched.shippingAddress && errors.shippingAddress}
+            success={touched.shippingAddress && !errors.shippingAddress && values.shippingAddress}
+          >
             <Input
-              value={formData.shippingAddress}
-              onChange={(e) => setFormData({...formData, shippingAddress: e.target.value})}
+              value={values.shippingAddress}
+              onChange={(e) => setValue("shippingAddress", e.target.value)}
+              onBlur={() => setFieldTouched("shippingAddress")}
               placeholder="Enter shipping address"
+              className={touched.shippingAddress && errors.shippingAddress ? "border-red-500" : ""}
             />
-          </div>
+          </ValidatedInput>
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -146,7 +169,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                 <Plus className="h-4 w-4 mr-2" />Add Item
               </Button>
             </div>
-            {formData.items.map((item, index) => (
+            {values.items.map((item, index) => (
               <div key={index} className="grid grid-cols-12 gap-4 items-end">
                 <div className="col-span-6">
                   <Label className="text-xs">Product Name</Label>
@@ -175,7 +198,7 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
                 </div>
                 <div className="col-span-11"></div>
                 <div className="col-span-1 flex justify-end">
-                  {formData.items.length > 1 && (
+                  {values.items.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -194,7 +217,10 @@ const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSub
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={() => onSubmit(formData)}>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!isValid && Object.keys(touched).length > 0}
+          >
             {order ? "Update Order" : "Create Order"}
           </Button>
         </DialogFooter>
@@ -208,6 +234,10 @@ const Orders = () => {
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [sortField, setSortField] = useState("created_at");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +287,10 @@ const Orders = () => {
       if (!isSupabaseConfigured) {
         // Use demo data when Supabase is not configured
         console.log('Using demo data - Supabase not configured');
+        
+        // Simulate loading delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setOrders([
           {
             id: '1',
@@ -429,6 +463,7 @@ const Orders = () => {
       }
 
       setIsFormDialogOpen(false);
+      
       toast({
         title: "Order Created",
         description: "New order has been created successfully."
@@ -564,6 +599,23 @@ const Orders = () => {
     }
   };
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return <ArrowUpDown className={`h-4 w-4 ${sortDirection === "asc" ? "text-blue-500" : "text-blue-500 rotate-180"}`} />;
+  };
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending':
@@ -595,15 +647,49 @@ const Orders = () => {
     return deliveryDate >= today && deliveryDate <= fiveDaysFromNow;
   };
 
-  const filteredOrders = orders.filter(order => {
-    const customer = order.customer || customers.find(c => c.id === order.customer_id);
-    const customerName = customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : '';
-    
-    const matchesSearch = customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter ? order.status === statusFilter : true;
-    return matchesSearch && matchesStatus;
-  });
+  // Filter and sort orders
+  const filteredAndSortedOrders = orders
+    .filter(order => {
+      const customer = order.customer || customers.find(c => c.id === order.customer_id);
+      const customerName = customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : '';
+      
+      const matchesSearch = customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           order.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter ? order.status === statusFilter : true;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      
+      if (sortField === 'customer_name') {
+        const aCustomer = a.customer || customers.find(c => c.id === a.customer_id);
+        const bCustomer = b.customer || customers.find(c => c.id === b.customer_id);
+        aValue = aCustomer ? (aCustomer.company_name || `${aCustomer.first_name} ${aCustomer.last_name}`) : '';
+        bValue = bCustomer ? (bCustomer.company_name || `${bCustomer.first_name} ${bCustomer.last_name}`) : '';
+      }
+      
+      if (sortDirection === "asc") {
+        return String(aValue || '').localeCompare(String(bValue || ''));
+      } else {
+        return String(bValue || '').localeCompare(String(aValue || ''));
+      }
+    });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredAndSortedOrders.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentOrders = filteredAndSortedOrders.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -619,8 +705,12 @@ const Orders = () => {
     return (
       <div className="h-full flex flex-col">
         <Header title="Orders & Deliveries" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
+        <div className="flex-1 p-6">
+          <Card className="border-none shadow-sm">
+            <CardContent className="p-0">
+              <TableSkeleton rows={5} columns={7} />
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -630,12 +720,12 @@ const Orders = () => {
     <div className="h-full flex flex-col">
       <Header title="Orders & Deliveries" />
       
-      <div className="flex-1 p-6 overflow-y-auto">
+      <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
         <div className="flex flex-col space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 gap-4">
             <Button
               onClick={() => setIsFormDialogOpen(true)}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />Create Order
             </Button>
@@ -647,10 +737,16 @@ const Orders = () => {
                   className="pl-10 w-full sm:w-64"
                   placeholder="Search orders..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setCurrentPage(1);
+              }}>
                 <SelectTrigger className="w-full sm:w-40">
                   <div className="flex items-center">
                     <Filter className="h-4 w-4 mr-2 text-gray-400" />
@@ -669,153 +765,220 @@ const Orders = () => {
             </div>
           </div>
 
-          <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          {filteredAndSortedOrders.length === 0 ? (
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Delivery Status</TableHead>
-                      <TableHead>Total Amount</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrders.length > 0 ? (
-                      filteredOrders.map((order) => {
-                        const delivery = order.delivery?.[0];
-                        const isUpcoming = delivery && isDeliveryUpcoming(delivery);
-                        
-                        return (
-                          <motion.tr
-                            key={order.id}
-                            variants={itemVariants}
-                            className="border-b hover:bg-gray-50"
+                <EmptyState
+                  icon={Package}
+                  title="No orders found"
+                  description={searchTerm || statusFilter ? 
+                    "No orders match your current filters. Try adjusting your search criteria." :
+                    "No orders found. Create your first order or convert a quote to an order to get started."
+                  }
+                  action={!searchTerm && !statusFilter}
+                  actionLabel="Create Order"
+                  onAction={() => setIsFormDialogOpen(true)}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <motion.div variants={containerVariants} initial="hidden" animate="visible">
+              <Card className="border-none shadow-sm">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("id")}
                           >
-                            <TableCell className="font-medium">
-                              <div className="flex items-center">
-                                <Package className="h-4 w-4 text-purple-500 mr-2" />
-                                #{order.id.slice(0, 8)}
-                                {isUpcoming && (
-                                  <Bell className="h-4 w-4 text-amber-500 ml-2" title="Delivery upcoming in 5 days" />
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{getCustomerName(order.customer_id)}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                {getStatusIcon(order.status)}
-                                <span className={`status-badge status-${order.status}`}>
-                                  {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {delivery ? (
+                            <div className="flex items-center space-x-2">
+                              <span>Order ID</span>
+                              {getSortIcon("id")}
+                            </div>
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("customer_name")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Customer</span>
+                              {getSortIcon("customer_name")}
+                            </div>
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="hidden md:table-cell">Delivery Status</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("total_amount")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Total Amount</span>
+                              {getSortIcon("total_amount")}
+                            </div>
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none hidden lg:table-cell"
+                            onClick={() => handleSort("created_at")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Created At</span>
+                              {getSortIcon("created_at")}
+                            </div>
+                          </TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {currentOrders.map((order) => {
+                          const delivery = order.delivery?.[0];
+                          const isUpcoming = delivery && isDeliveryUpcoming(delivery);
+                          
+                          return (
+                            <motion.tr
+                              key={order.id}
+                              variants={itemVariants}
+                              className="border-b hover:bg-gray-50"
+                            >
+                              <TableCell className="font-medium">
+                                <div className="flex items-center">
+                                  <Package className="h-4 w-4 text-purple-500 mr-2 flex-shrink-0" />
+                                  <span className="truncate">#{order.id.slice(0, 8)}</span>
+                                  {isUpcoming && (
+                                    <Bell className="h-4 w-4 text-amber-500 ml-2 flex-shrink-0" title="Delivery upcoming in 5 days" />
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center">
+                                  <User className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                                  <span className="truncate">{getCustomerName(order.customer_id)}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
                                 <div className="flex items-center space-x-2">
-                                  <Truck className="h-4 w-4 text-blue-500" />
-                                  <span className={`status-badge status-${delivery.status}`}>
-                                    {(delivery.status || '').split('_').map(word => 
-                                      word.charAt(0).toUpperCase() + word.slice(1)
-                                    ).join(' ')}
+                                  {getStatusIcon(order.status)}
+                                  <span className={`status-badge status-${order.status}`}>
+                                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                   </span>
                                 </div>
-                              ) : (
-                                <span className="text-gray-500">No delivery info</span>
-                              )}
-                            </TableCell>
-                            <TableCell>${order.total_amount?.toLocaleString() || '0'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center text-gray-500">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                {new Date(order.created_at).toLocaleDateString()}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-1">
-                                {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                                  <>
-                                    {order.status === 'pending' && (
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {delivery ? (
+                                  <div className="flex items-center space-x-2">
+                                    <Truck className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                    <span className={`status-badge status-${delivery.status}`}>
+                                      {(delivery.status || '').split('_').map(word => 
+                                        word.charAt(0).toUpperCase() + word.slice(1)
+                                      ).join(' ')}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-500">No delivery info</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center">
+                                  <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                  <span className="truncate">${order.total_amount?.toLocaleString() || '0'}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell">
+                                <div className="flex items-center text-gray-500">
+                                  <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                                  <span className="truncate">{new Date(order.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end space-x-1">
+                                  {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                    <>
+                                      {order.status === 'pending' && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleUpdateOrderStatus(order.id, 'processing')}
+                                          title="Start Processing"
+                                        >
+                                          <Package className="h-4 w-4 text-blue-500" />
+                                        </Button>
+                                      )}
+                                      {order.status === 'processing' && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleUpdateOrderStatus(order.id, 'shipped')}
+                                          title="Mark as Shipped"
+                                        >
+                                          <Truck className="h-4 w-4 text-purple-500" />
+                                        </Button>
+                                      )}
+                                      {order.status === 'shipped' && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
+                                          title="Mark as Delivered"
+                                        >
+                                          <CheckCircle className="h-4 w-4 text-green-500" />
+                                        </Button>
+                                      )}
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        onClick={() => handleUpdateOrderStatus(order.id, 'processing')}
-                                        title="Start Processing"
+                                        onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
+                                        title="Cancel Order"
                                       >
-                                        <Package className="h-4 w-4 text-blue-500" />
+                                        <XCircle className="h-4 w-4 text-red-500" />
                                       </Button>
-                                    )}
-                                    {order.status === 'processing' && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleUpdateOrderStatus(order.id, 'shipped')}
-                                        title="Mark as Shipped"
-                                      >
-                                        <Truck className="h-4 w-4 text-purple-500" />
-                                      </Button>
-                                    )}
-                                    {order.status === 'shipped' && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => handleUpdateOrderStatus(order.id, 'delivered')}
-                                        title="Mark as Delivered"
-                                      >
-                                        <CheckCircle className="h-4 w-4 text-green-500" />
-                                      </Button>
-                                    )}
+                                    </>
+                                  )}
+                                  {delivery && delivery.status !== 'delivered' && (
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => handleUpdateOrderStatus(order.id, 'cancelled')}
-                                      title="Cancel Order"
+                                      onClick={() => handleUpdateDeliveryStatus(delivery.id, 'delivered')}
+                                      title="Mark Delivery as Complete"
                                     >
-                                      <XCircle className="h-4 w-4 text-red-500" />
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
                                     </Button>
-                                  </>
-                                )}
-                                {delivery && delivery.status !== 'delivered' && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleUpdateDeliveryStatus(delivery.id, 'delivered')}
-                                    title="Mark Delivery as Complete"
-                                  >
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                  </Button>
-                                )}
-                                {delivery && isUpcoming && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleSendDeliveryReminder(order)}
-                                    title="Send Delivery Reminder"
-                                  >
-                                    <Bell className="h-4 w-4 text-amber-500" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </motion.tr>
-                        );
-                      })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                          No orders found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </motion.div>
+                                  )}
+                                  {delivery && isUpcoming && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleSendDeliveryReminder(order)}
+                                      title="Send Delivery Reminder"
+                                    >
+                                      <Bell className="h-4 w-4 text-amber-500" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  {totalPages > 1 && (
+                    <div className="border-t p-4">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        itemsPerPage={itemsPerPage}
+                        totalItems={filteredAndSortedOrders.length}
+                        onItemsPerPageChange={handleItemsPerPageChange}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
       </div>
 

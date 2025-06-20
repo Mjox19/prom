@@ -57,64 +57,66 @@ const ProductTable = ({ products, onEdit, onDelete, loading = false, onAddProduc
     <motion.div variants={containerVariants} initial="hidden" animate="visible">
       <Card className="border-none shadow-sm">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Base Price</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => (
-                <motion.tr
-                  key={product.id}
-                  variants={itemVariants}
-                  className="border-b transition-colors hover:bg-gray-50"
-                >
-                  <TableCell className="font-medium">
-                    <div className="flex items-center">
-                      <Package className="h-4 w-4 text-teal-500 mr-2" />
-                      {product.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Tag className="h-4 w-4 text-gray-400 mr-2" />
-                      {product.category}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <DollarSign className="h-4 w-4 text-gray-400 mr-1" />
-                      {getDefaultPrice(product).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => onEdit(product)}
-                        title="Edit Product"
-                      >
-                        <Edit className="h-4 w-4 text-amber-500" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => onDelete(product)}
-                        title="Delete Product"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </motion.tr>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product Name</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Base Price</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.map((product) => (
+                  <motion.tr
+                    key={product.id}
+                    variants={itemVariants}
+                    className="border-b transition-colors hover:bg-gray-50"
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center">
+                        <Package className="h-4 w-4 text-teal-500 mr-2 flex-shrink-0" />
+                        <span className="truncate">{product.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Tag className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                        <span className="truncate">{product.category}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <DollarSign className="h-4 w-4 text-gray-400 mr-1 flex-shrink-0" />
+                        <span className="truncate">{getDefaultPrice(product).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => onEdit(product)}
+                          title="Edit Product"
+                        >
+                          <Edit className="h-4 w-4 text-amber-500" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => onDelete(product)}
+                          title="Delete Product"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </motion.tr>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </motion.div>

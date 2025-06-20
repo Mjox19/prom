@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
-  Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User
+  Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,52 +16,56 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit }) => {
-  const [currentSale, setCurrentSale] = useState({
-    customerId: "", 
-    title: "", 
-    description: "", 
-    amount: 0, 
-    status: "pending",
-    payment_status: "unpaid",
-    expectedCloseDate: ""
-  });
+  const initialValues = {
+    customerId: saleToEdit?.customer_id || "",
+    title: saleToEdit?.title || `Order #${Date.now().toString().slice(-6)}`,
+    description: saleToEdit?.description || "",
+    amount: saleToEdit?.total_amount || 0,
+    status: saleToEdit?.status || "pending",
+    payment_status: saleToEdit?.payment_status || "unpaid"
+  };
+
+  const rules = {
+    customerId: [validationRules.required],
+    title: [validationRules.required],
+    amount: [validationRules.required, validationRules.positiveNumber]
+  };
+
+  const {
+    values,
+    errors,
+    touched,
+    setValue,
+    setTouched: setFieldTouched,
+    validateAll,
+    reset,
+    isValid
+  } = useFormValidation(initialValues, rules);
 
   useEffect(() => {
     if (saleToEdit) {
-      setCurrentSale({
-        customerId: saleToEdit.customer_id,
-        title: saleToEdit.title || `Order #${saleToEdit.id.slice(0, 8)}`,
-        description: saleToEdit.description || "",
-        amount: saleToEdit.total_amount,
-        status: saleToEdit.status,
-        payment_status: saleToEdit.payment_status,
-        expectedCloseDate: saleToEdit.expected_close_date || ""
+      Object.keys(initialValues).forEach(key => {
+        setValue(key, initialValues[key]);
       });
     } else {
-      resetCurrentSale();
+      reset();
     }
   }, [saleToEdit, open]);
 
-  const resetCurrentSale = () => setCurrentSale({
-    customerId: "", 
-    title: "", 
-    description: "", 
-    amount: 0, 
-    status: "pending",
-    payment_status: "unpaid",
-    expectedCloseDate: ""
-  });
-
-  const handleChange = (id, value) => setCurrentSale(prev => ({ ...prev, [id]: value }));
-  
   const handleSubmit = () => {
-    onSubmit(currentSale);
+    if (validateAll()) {
+      onSubmit(values);
+    }
   };
 
   const paymentStatuses = [
@@ -78,18 +83,30 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { onOpenChange(isOpen); if(!isOpen) resetCurrentSale(); }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{saleToEdit ? "Edit Order" : "Add New Order"}</DialogTitle>
           <DialogDescription>{saleToEdit ? "Update order details." : "Add a new order to track."}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="customer">Customer</Label>
-              <Select value={currentSale.customerId} onValueChange={(val) => handleChange("customerId", val)}>
-                <SelectTrigger id="customer"><SelectValue placeholder="Select customer" /></SelectTrigger>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ValidatedInput
+              label="Customer"
+              required
+              error={touched.customerId && errors.customerId}
+              success={touched.customerId && !errors.customerId && values.customerId}
+            >
+              <Select 
+                value={values.customerId} 
+                onValueChange={(val) => {
+                  setValue("customerId", val);
+                  setFieldTouched("customerId");
+                }}
+              >
+                <SelectTrigger className={touched.customerId && errors.customerId ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
                 <SelectContent>
                   {customers.map(c => (
                     <SelectItem key={c.id} value={c.id}>
@@ -98,11 +115,13 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Order Status</Label>
-              <Select value={currentSale.status} onValueChange={(val) => handleChange("status", val)}>
-                <SelectTrigger id="status"><SelectValue placeholder="Select status" /></SelectTrigger>
+            </ValidatedInput>
+            
+            <ValidatedInput label="Order Status">
+              <Select value={values.status} onValueChange={(val) => setValue("status", val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
                 <SelectContent>
                   {orderStatuses.map(status => (
                     <SelectItem key={status.value} value={status.value}>
@@ -111,21 +130,48 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </ValidatedInput>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="title">Order Title</Label>
-            <Input id="title" value={currentSale.title} onChange={(e) => handleChange("title", e.target.value)} placeholder="Enter order title" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" type="number" value={currentSale.amount} onChange={(e) => handleChange("amount", parseFloat(e.target.value) || 0)} placeholder="Enter amount" min="0" step="0.01" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="payment_status">Payment Status</Label>
-              <Select value={currentSale.payment_status} onValueChange={(val) => handleChange("payment_status", val)}>
-                <SelectTrigger id="payment_status"><SelectValue placeholder="Select payment status" /></SelectTrigger>
+          
+          <ValidatedInput
+            label="Order Title"
+            required
+            error={touched.title && errors.title}
+            success={touched.title && !errors.title && values.title}
+          >
+            <Input 
+              value={values.title} 
+              onChange={(e) => setValue("title", e.target.value)}
+              onBlur={() => setFieldTouched("title")}
+              placeholder="Enter order title"
+              className={touched.title && errors.title ? "border-red-500" : ""}
+            />
+          </ValidatedInput>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ValidatedInput
+              label="Amount"
+              required
+              error={touched.amount && errors.amount}
+              success={touched.amount && !errors.amount && values.amount}
+            >
+              <Input 
+                type="number" 
+                value={values.amount} 
+                onChange={(e) => setValue("amount", parseFloat(e.target.value) || 0)}
+                onBlur={() => setFieldTouched("amount")}
+                placeholder="Enter amount" 
+                min="0" 
+                step="0.01"
+                className={touched.amount && errors.amount ? "border-red-500" : ""}
+              />
+            </ValidatedInput>
+            
+            <ValidatedInput label="Payment Status">
+              <Select value={values.payment_status} onValueChange={(val) => setValue("payment_status", val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment status" />
+                </SelectTrigger>
                 <SelectContent>
                   {paymentStatuses.map(status => (
                     <SelectItem key={status.value} value={status.value}>
@@ -134,16 +180,26 @@ const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit })
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </ValidatedInput>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" value={currentSale.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Enter order description" />
-          </div>
+          
+          <ValidatedInput label="Description">
+            <Textarea 
+              value={values.description} 
+              onChange={(e) => setValue("description", e.target.value)} 
+              placeholder="Enter order description"
+              rows={3}
+            />
+          </ValidatedInput>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>{saleToEdit ? "Save Changes" : "Add Order"}</Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!isValid && Object.keys(touched).length > 0}
+          >
+            {saleToEdit ? "Save Changes" : "Add Order"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -155,6 +211,11 @@ const Sales = () => {
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [sortField, setSortField] = useState("created_at");
+  const [sortDirection, setSortDirection] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -199,6 +260,10 @@ const Sales = () => {
       if (!isSupabaseConfigured) {
         // Use demo data when Supabase is not configured
         console.log('Using demo data - Supabase not configured');
+        
+        // Simulate loading delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setSales([
           {
             id: '1',
@@ -504,15 +569,66 @@ const Sales = () => {
     setEditingSale(sale);
     setIsFormDialogOpen(true);
   };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+    }
+    return <ArrowUpDown className={`h-4 w-4 ${sortDirection === "asc" ? "text-blue-500" : "text-blue-500 rotate-180"}`} />;
+  };
   
-  const filteredSales = sales.filter(sale => {
-    const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customer?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customer?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customer?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter ? sale.status === statusFilter : true;
-    return matchesSearch && matchesStatus;
-  });
+  // Filter and sort sales
+  const filteredAndSortedSales = sales
+    .filter(sale => {
+      const matchesSearch = sale.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           sale.customer?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           sale.customer?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           sale.customer?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter ? sale.status === statusFilter : true;
+      const matchesPayment = paymentFilter ? sale.payment_status === paymentFilter : true;
+      return matchesSearch && matchesStatus && matchesPayment;
+    })
+    .sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      
+      // Handle nested customer data
+      if (sortField === 'customer_name') {
+        aValue = a.customer ? `${a.customer.first_name} ${a.customer.last_name}` : '';
+        bValue = b.customer ? `${b.customer.first_name} ${b.customer.last_name}` : '';
+      }
+      
+      if (sortDirection === "asc") {
+        return String(aValue || '').localeCompare(String(bValue || ''));
+      } else {
+        return String(bValue || '').localeCompare(String(aValue || ''));
+      }
+    });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredAndSortedSales.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentSales = filteredAndSortedSales.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const getCustomerName = (customer) => {
     if (!customer) return "Unknown Customer";
@@ -556,8 +672,12 @@ const Sales = () => {
     return (
       <div className="h-full flex flex-col">
         <Header title="Sales Pipeline" />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700"></div>
+        <div className="flex-1 p-6">
+          <Card className="border-none shadow-sm">
+            <CardContent className="p-0">
+              <TableSkeleton rows={5} columns={7} />
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -566,12 +686,12 @@ const Sales = () => {
   return (
     <div className="h-full flex flex-col">
       <Header title="Sales Pipeline" />
-      <div className="flex-1 p-6 overflow-y-auto">
+      <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
         <div className="flex flex-col space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 gap-4">
             <Dialog>
               <DialogTrigger asChild>
-                <Button onClick={() => { setEditingSale(null); setIsFormDialogOpen(true); }} className="bg-green-600 hover:bg-green-700">
+                <Button onClick={() => { setEditingSale(null); setIsFormDialogOpen(true); }} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />Add Order
                 </Button>
               </DialogTrigger>
@@ -579,11 +699,25 @@ const Sales = () => {
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input className="pl-10 w-full sm:w-64" placeholder="Search orders..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <Input 
+                  className="pl-10 w-full sm:w-64" 
+                  placeholder="Search orders..." 
+                  value={searchTerm} 
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }} 
+                />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setCurrentPage(1);
+              }}>
                 <SelectTrigger className="w-full sm:w-40">
-                  <div className="flex items-center"><Filter className="h-4 w-4 mr-2 text-gray-400" /><SelectValue placeholder="All Statuses" /></div>
+                  <div className="flex items-center">
+                    <Filter className="h-4 w-4 mr-2 text-gray-400" />
+                    <SelectValue placeholder="All Statuses" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All Statuses</SelectItem>
@@ -592,99 +726,165 @@ const Sales = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={paymentFilter} onValueChange={(value) => {
+                setPaymentFilter(value);
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <div className="flex items-center">
+                    <DollarSign className="h-4 w-4 mr-2 text-gray-400" />
+                    <SelectValue placeholder="Payment" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Payments</SelectItem>
+                  <SelectItem value="unpaid">Unpaid</SelectItem>
+                  <SelectItem value="half_paid">Half Paid</SelectItem>
+                  <SelectItem value="fully_paid">Fully Paid</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
-          <motion.div variants={containerVariants} initial="hidden" animate="visible">
+          {filteredAndSortedSales.length === 0 ? (
             <Card className="border-none shadow-sm">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created Date</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Payment Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSales.length > 0 ? (
-                      filteredSales.map((sale) => (
-                        <motion.tr key={sale.id} variants={itemVariants} className="border-b hover:bg-gray-50">
-                          <TableCell className="font-medium">
-                            <div className="flex items-center">
-                              <TrendingUp className="h-4 w-4 text-green-500 mr-2" />
-                              {sale.title || `Order #${sale.id.slice(0, 8)}`}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <User className="h-4 w-4 text-gray-400 mr-2" />
-                              {getCustomerName(sale.customer)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(sale.status)}`}>
-                              {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center text-gray-500">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(sale.created_at).toLocaleDateString()}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <DollarSign className="h-4 w-4 text-gray-400" />
-                              {sale.total_amount?.toLocaleString()}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(sale.payment_status)}`}>
-                              {sale.payment_status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-1">
-                              <Select
-                                value={sale.payment_status}
-                                onValueChange={(value) => handleUpdatePaymentStatus(sale.id, value)}
-                              >
-                                <SelectTrigger className="w-[120px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unpaid">Unpaid</SelectItem>
-                                  <SelectItem value="half_paid">Half Paid</SelectItem>
-                                  <SelectItem value="fully_paid">Fully Paid</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(sale)} title="Edit Order">
-                                <Edit className="h-4 w-4 text-amber-500" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => {setSelectedSale(sale); setIsDeleteDialogOpen(true);}} title="Delete">
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </motion.tr>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                          {loading ? "Loading orders..." : "No orders found. Orders from converted quotes will appear here."}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                <EmptyState
+                  icon={TrendingUp}
+                  title="No orders found"
+                  description={searchTerm || statusFilter || paymentFilter ? 
+                    "No orders match your current filters. Try adjusting your search criteria." :
+                    "No orders found. Orders from converted quotes will appear here, or you can create orders directly."
+                  }
+                  action={!searchTerm && !statusFilter && !paymentFilter}
+                  actionLabel="Add Order"
+                  onAction={() => setIsFormDialogOpen(true)}
+                />
               </CardContent>
             </Card>
-          </motion.div>
+          ) : (
+            <motion.div variants={containerVariants} initial="hidden" animate="visible">
+              <Card className="border-none shadow-sm">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("title")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Order</span>
+                              {getSortIcon("title")}
+                            </div>
+                          </TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("customer_name")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Customer</span>
+                              {getSortIcon("customer_name")}
+                            </div>
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="hidden md:table-cell">Created Date</TableHead>
+                          <TableHead 
+                            className="cursor-pointer hover:bg-gray-50 select-none"
+                            onClick={() => handleSort("total_amount")}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>Amount</span>
+                              {getSortIcon("total_amount")}
+                            </div>
+                          </TableHead>
+                          <TableHead>Payment Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {currentSales.map((sale) => (
+                          <motion.tr key={sale.id} variants={itemVariants} className="border-b hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center">
+                                <TrendingUp className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                                <span className="truncate">{sale.title || `Order #${sale.id.slice(0, 8)}`}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <User className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
+                                <span className="truncate">{getCustomerName(sale.customer)}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getOrderStatusColor(sale.status)}`}>
+                                {sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <div className="flex items-center text-gray-500">
+                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
+                                <span className="truncate">{new Date(sale.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                <span className="truncate">{sale.total_amount?.toLocaleString()}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(sale.payment_status)}`}>
+                                {sale.payment_status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-1">
+                                <Select
+                                  value={sale.payment_status}
+                                  onValueChange={(value) => handleUpdatePaymentStatus(sale.id, value)}
+                                >
+                                  <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                                    <SelectItem value="half_paid">Half Paid</SelectItem>
+                                    <SelectItem value="fully_paid">Fully Paid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(sale)} title="Edit Order">
+                                  <Edit className="h-4 w-4 text-amber-500" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => {setSelectedSale(sale); setIsDeleteDialogOpen(true);}} title="Delete">
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </motion.tr>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  {totalPages > 1 && (
+                    <div className="border-t p-4">
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={handlePageChange}
+                        itemsPerPage={itemsPerPage}
+                        totalItems={filteredAndSortedSales.length}
+                        onItemsPerPageChange={handleItemsPerPageChange}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </div>
       </div>
 
@@ -700,7 +900,9 @@ const Sales = () => {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>This action cannot be undone.</DialogDescription>
+            <DialogDescription>
+              Are you sure you want to delete this order? This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>

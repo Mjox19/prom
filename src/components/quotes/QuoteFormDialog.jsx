@@ -5,23 +5,57 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/co
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import { Plus, Trash2 } from "lucide-react";
 import { getProducts, getProductPriceForQuantity } from "@/lib/productData";
 
 const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => {
   const [allProducts, setAllProducts] = useState([]);
-  const [newQuote, setNewQuote] = useState({
-    customerId: "",
-    title: "",
-    quoteNumber: "",
-    description: "",
-    items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-    subtotal: 0,
-    tax: 0,
-    total: 0,
-    validUntil: "",
-    expectedDeliveryDate: ""
-  });
+  
+  const initialValues = {
+    customerId: quoteToEdit?.customer_id || "",
+    title: quoteToEdit?.title || "",
+    description: quoteToEdit?.description || "",
+    items: quoteToEdit?.items?.map(item => ({
+      productId: item.productId || "",
+      description: item.description || "",
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+      manualPrice: item.manualPrice || false,
+    })) || [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
+    subtotal: quoteToEdit?.subtotal || 0,
+    tax: quoteToEdit?.tax || 0,
+    total: quoteToEdit?.total || 0,
+    validUntil: quoteToEdit?.valid_until ? quoteToEdit.valid_until.split('T')[0] : (() => {
+      const date = new Date();
+      date.setDate(date.getDate() + 5);
+      return date.toISOString().split('T')[0];
+    })(),
+    expectedDeliveryDate: quoteToEdit?.expected_delivery_date ? quoteToEdit.expected_delivery_date.split('T')[0] : (() => {
+      const date = new Date();
+      date.setDate(date.getDate() + 15);
+      return date.toISOString().split('T')[0];
+    })()
+  };
+
+  const rules = {
+    title: [validationRules.required],
+    customerId: [validationRules.required],
+    validUntil: [validationRules.required],
+    expectedDeliveryDate: [validationRules.required]
+  };
+
+  const {
+    values,
+    errors,
+    touched,
+    setValue,
+    setTouched: setFieldTouched,
+    validateAll,
+    reset,
+    isValid
+  } = useFormValidation(initialValues, rules);
 
   useEffect(() => {
     setAllProducts(getProducts());
@@ -29,49 +63,16 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
 
   useEffect(() => {
     if (quoteToEdit) {
-      const items = quoteToEdit.items?.map(item => ({
-        productId: item.productId || "",
-        description: item.description || "",
-        quantity: item.quantity || 1,
-        price: item.price || 0,
-        manualPrice: item.manualPrice || false,
-      })) || [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }];
-
-      setNewQuote({
-        ...quoteToEdit,
-        title: quoteToEdit.title || "",
-        quoteNumber: quoteToEdit.quote_number || "",
-        items
+      Object.keys(initialValues).forEach(key => {
+        setValue(key, initialValues[key]);
       });
     } else {
-      // Set default dates for new quotes
-      const today = new Date();
-      
-      // Valid until - 5 days from today
-      const validUntil = new Date(today);
-      validUntil.setDate(validUntil.getDate() + 5);
-      
-      // Expected delivery - 15 days from today
-      const expectedDelivery = new Date(today);
-      expectedDelivery.setDate(expectedDelivery.getDate() + 15);
-
-      setNewQuote({
-        customerId: "",
-        title: "",
-        quoteNumber: "",
-        description: "",
-        items: [{ productId: "", description: "", quantity: 1, price: 0, manualPrice: false }],
-        subtotal: 0,
-        tax: 0,
-        total: 0,
-        validUntil: validUntil.toISOString().split('T')[0],
-        expectedDeliveryDate: expectedDelivery.toISOString().split('T')[0]
-      });
+      reset();
     }
   }, [quoteToEdit]);
 
   const handleItemChange = (index, field, value) => {
-    const updatedItems = [...newQuote.items];
+    const updatedItems = [...values.items];
     const currentItem = updatedItems[index];
     
     if (field === "productId") {
@@ -99,19 +100,16 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       currentItem[field] = value;
     }
     
-    setNewQuote(prev => ({ ...prev, items: updatedItems }));
+    setValue("items", updatedItems);
   };
   
   const handleAddItem = () => {
-    setNewQuote(prev => ({
-      ...prev,
-      items: [...prev.items, { productId: "", description: "", quantity: 1, price: 0, manualPrice: false }]
-    }));
+    setValue("items", [...values.items, { productId: "", description: "", quantity: 1, price: 0, manualPrice: false }]);
   };
 
   const handleRemoveItem = (index) => {
-    const updatedItems = newQuote.items.filter((_, i) => i !== index);
-    setNewQuote(prev => ({ ...prev, items: updatedItems }));
+    const updatedItems = values.items.filter((_, i) => i !== index);
+    setValue("items", updatedItems);
   };
 
   const calculateTotals = (items) => {
@@ -122,12 +120,16 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   };
 
   useEffect(() => {
-    const { subtotal, tax, total } = calculateTotals(newQuote.items);
-    setNewQuote(prev => ({ ...prev, subtotal, tax, total }));
-  }, [newQuote.items]);
+    const { subtotal, tax, total } = calculateTotals(values.items);
+    setValue("subtotal", subtotal);
+    setValue("tax", tax);
+    setValue("total", total);
+  }, [values.items]);
 
   const handleSubmit = () => {
-    onSubmit(newQuote);
+    if (validateAll()) {
+      onSubmit(values);
+    }
   };
 
   return (
@@ -138,21 +140,47 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       </DialogHeader>
       <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
         {quoteToEdit && (
-          <div className="space-y-2">
-            <Label htmlFor="quoteNumber">Quote Number</Label>
+          <ValidatedInput label="Quote Number">
             <Input
-              id="quoteNumber"
-              value={newQuote.quoteNumber}
+              value={quoteToEdit.quote_number || ""}
               disabled
               className="bg-gray-50 font-medium text-gray-700"
             />
-          </div>
+          </ValidatedInput>
         )}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="customer">Customer</Label>
-            <Select value={newQuote.customerId} onValueChange={(value) => setNewQuote({...newQuote, customerId: value})}>
-              <SelectTrigger id="customer"><SelectValue placeholder="Select customer" /></SelectTrigger>
+
+        <ValidatedInput
+          label="Quote Title"
+          required
+          error={touched.title && errors.title}
+          success={touched.title && !errors.title && values.title}
+        >
+          <Input
+            value={values.title}
+            onChange={(e) => setValue("title", e.target.value)}
+            onBlur={() => setFieldTouched("title")}
+            placeholder="Enter quote title"
+            className={touched.title && errors.title ? "border-red-500" : ""}
+          />
+        </ValidatedInput>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ValidatedInput
+            label="Customer"
+            required
+            error={touched.customerId && errors.customerId}
+            success={touched.customerId && !errors.customerId && values.customerId}
+          >
+            <Select 
+              value={values.customerId} 
+              onValueChange={(value) => {
+                setValue("customerId", value);
+                setFieldTouched("customerId");
+              }}
+            >
+              <SelectTrigger className={touched.customerId && errors.customerId ? "border-red-500" : ""}>
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
               <SelectContent>
                 {customers.map(c => (
                   <SelectItem key={c.id} value={c.id}>
@@ -161,38 +189,51 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="validUntil">Valid Until</Label>
-            <Input
-              id="validUntil"
-              type="date"
-              value={newQuote.validUntil}
-              disabled
-              className="bg-gray-50"
+          </ValidatedInput>
+          
+          <ValidatedInput
+            label="Valid Until"
+            required
+            error={touched.validUntil && errors.validUntil}
+            success={touched.validUntil && !errors.validUntil && values.validUntil}
+          >
+            <DatePicker
+              value={values.validUntil}
+              onChange={(value) => {
+                setValue("validUntil", value);
+                setFieldTouched("validUntil");
+              }}
+              placeholder="Select valid until date"
+              className={touched.validUntil && errors.validUntil ? "border-red-500" : ""}
             />
-          </div>
+          </ValidatedInput>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Special Client Notes</Label>
+        <ValidatedInput label="Special Client Notes">
           <Textarea
-            id="description"
-            value={newQuote.description}
-            onChange={(e) => setNewQuote({...newQuote, description: e.target.value})}
+            value={values.description}
+            onChange={(e) => setValue("description", e.target.value)}
             placeholder="Enter any special notes for this client"
+            rows={3}
           />
-        </div>
+        </ValidatedInput>
 
-        <div className="space-y-2">
-          <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
-          <Input
-            id="expectedDeliveryDate"
-            type="date"
-            value={newQuote.expectedDeliveryDate}
-            onChange={(e) => setNewQuote({...newQuote, expectedDeliveryDate: e.target.value})}
+        <ValidatedInput
+          label="Expected Delivery Date"
+          required
+          error={touched.expectedDeliveryDate && errors.expectedDeliveryDate}
+          success={touched.expectedDeliveryDate && !errors.expectedDeliveryDate && values.expectedDeliveryDate}
+        >
+          <DatePicker
+            value={values.expectedDeliveryDate}
+            onChange={(value) => {
+              setValue("expectedDeliveryDate", value);
+              setFieldTouched("expectedDeliveryDate");
+            }}
+            placeholder="Select expected delivery date"
+            className={touched.expectedDeliveryDate && errors.expectedDeliveryDate ? "border-red-500" : ""}
           />
-        </div>
+        </ValidatedInput>
         
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -201,50 +242,92 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <Plus className="h-4 w-4 mr-1" />Add Item
             </Button>
           </div>
-          {newQuote.items.map((item, index) => (
+          {values.items.map((item, index) => (
             <div key={index} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
               <div className="col-span-4 space-y-1">
-                <Label htmlFor={`item-product-${index}`} className="text-xs">Product</Label>
+                <Label className="text-xs">Product</Label>
                 <Select value={item.productId} onValueChange={(value) => handleItemChange(index, "productId", value)}>
-                  <SelectTrigger id={`item-product-${index}`}><SelectValue placeholder="Select product" /></SelectTrigger>
-                  <SelectContent>{allProducts.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allProducts.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="col-span-4 space-y-1">
-                <Label htmlFor={`item-desc-${index}`} className="text-xs">Description</Label>
-                <Input id={`item-desc-${index}`} value={item.description} onChange={(e) => handleItemChange(index, "description", e.target.value)} placeholder="Item description" />
+                <Label className="text-xs">Description</Label>
+                <Input 
+                  value={item.description} 
+                  onChange={(e) => handleItemChange(index, "description", e.target.value)} 
+                  placeholder="Item description" 
+                />
               </div>
               <div className="col-span-2 space-y-1">
-                <Label htmlFor={`item-qty-${index}`} className="text-xs">Quantity</Label>
-                <Input id={`item-qty-${index}`} type="number" value={item.quantity} onChange={(e) => handleItemChange(index, "quantity", e.target.value)} placeholder="Qty" min="1" />
+                <Label className="text-xs">Quantity</Label>
+                <Input 
+                  type="number" 
+                  value={item.quantity} 
+                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)} 
+                  placeholder="Qty" 
+                  min="1" 
+                />
               </div>
               <div className="col-span-2 space-y-1">
-                <Label htmlFor={`item-price-${index}`} className="text-xs">Price</Label>
-                <Input id={`item-price-${index}`} type="number" value={item.price} onChange={(e) => handleItemChange(index, "price", e.target.value)} placeholder="Price" min="0" step="0.01" disabled={!item.manualPrice && item.quantity <= 10000} />
+                <Label className="text-xs">Price</Label>
+                <Input 
+                  type="number" 
+                  value={item.price} 
+                  onChange={(e) => handleItemChange(index, "price", e.target.value)} 
+                  placeholder="Price" 
+                  min="0" 
+                  step="0.01" 
+                  disabled={!item.manualPrice && item.quantity <= 10000} 
+                />
               </div>
-              <div className="col-span-11 text-right text-sm font-medium">${(item.quantity * item.price).toFixed(2)}</div>
+              <div className="col-span-11 text-right text-sm font-medium">
+                ${(item.quantity * item.price).toFixed(2)}
+              </div>
               <div className="col-span-1 flex justify-end">
-                {newQuote.items.length > 1 && (
-                  <Button type="button\" variant="ghost\" size="icon\" onClick={() => handleRemoveItem(index)}>
+                {values.items.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
                 )}
               </div>
               {item.manualPrice && item.quantity > 10000 && (
-                <div className="col-span-12 text-xs text-amber-600">Manual price entry enabled for quantity over 10,000.</div>
+                <div className="col-span-12 text-xs text-amber-600">
+                  Manual price entry enabled for quantity over 10,000.
+                </div>
               )}
             </div>
           ))}
           <div className="border-t pt-4 space-y-2">
-            <div className="flex justify-between text-sm"><span>Subtotal:</span><span>${newQuote.subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between text-sm"><span>Tax (8%):</span><span>${newQuote.tax.toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold"><span>Total:</span><span>${newQuote.total.toFixed(2)}</span></div>
+            <div className="flex justify-between text-sm">
+              <span>Subtotal:</span>
+              <span>${values.subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Tax (8%):</span>
+              <span>${values.tax.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold">
+              <span>Total:</span>
+              <span>${values.total.toFixed(2)}</span>
+            </div>
           </div>
         </div>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button onClick={handleSubmit}>{quoteToEdit ? "Save Changes" : "Create Quote"}</Button>
+        <Button 
+          onClick={handleSubmit}
+          disabled={!isValid && Object.keys(touched).length > 0}
+        >
+          {quoteToEdit ? "Save Changes" : "Create Quote"}
+        </Button>
       </DialogFooter>
     </>
   );
