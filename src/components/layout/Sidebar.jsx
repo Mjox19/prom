@@ -2,20 +2,24 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, Package, Truck } from 'lucide-react';
-
-const navItems = [
-  { icon: BarChart3, label: "Dashboard", path: "/" },
-  { icon: FileText, label: "Quotes", path: "/quotes" },
-  { icon: TrendingUp, label: "Sales", path: "/sales" },
-  { icon: Users, label: "Customers", path: "/customers" },
-  { icon: Package, label: "Products", path: "/products" },
-  { icon: Truck, label: "Orders & Deliveries", path: "/orders" },
-  { icon: Settings, label: "Settings", path: "/settings" },
-];
+import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, Package, Truck, Shield } from 'lucide-react';
+import { useAuth } from "@/contexts/AuthContext";
 
 const Sidebar = () => {
   const location = useLocation();
+  const { isSuperAdmin } = useAuth();
+
+  const navItems = [
+    { icon: BarChart3, label: "Dashboard", path: "/" },
+    { icon: FileText, label: "Quotes", path: "/quotes" },
+    { icon: TrendingUp, label: "Sales", path: "/sales" },
+    { icon: Users, label: "Customers", path: "/customers" },
+    { icon: Package, label: "Products", path: "/products" },
+    { icon: Truck, label: "Orders & Deliveries", path: "/orders" },
+    { icon: Settings, label: "Settings", path: "/settings" },
+    // Only show admin panel for super admins
+    ...(isSuperAdmin() ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : [])
+  ];
 
   return (
     <div className="h-screen w-64 bg-white border-r border-gray-200 text-gray-900 flex flex-col shadow-sm">

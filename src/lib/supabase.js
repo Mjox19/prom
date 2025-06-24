@@ -71,3 +71,63 @@ export const generateQuoteNumber = () => {
   const timestamp = Date.now().toString().slice(-6);
   return `QT-${year}-${timestamp}`;
 };
+
+// Helper functions for role checking (can be used in components)
+export const checkUserRole = async (userId, requiredRole) => {
+  if (!isSupabaseConfigured) {
+    return true; // Demo mode - allow all actions
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw error;
+
+    switch (requiredRole) {
+      case 'super_admin':
+        return data.role === 'super_admin';
+      case 'admin':
+        return ['admin', 'super_admin'].includes(data.role);
+      case 'user':
+        return ['user', 'admin', 'super_admin'].includes(data.role);
+      default:
+        return true;
+    }
+  } catch (error) {
+    console.error('Error checking user role:', error);
+    return false;
+  }
+};
+
+// Get user profile with role
+export const getUserProfile = async (userId) => {
+  if (!isSupabaseConfigured) {
+    return {
+      id: DEMO_USER_ID,
+      email: 'demo@example.com',
+      first_name: 'Demo',
+      last_name: 'User',
+      full_name: 'Demo User',
+      role: 'super_admin',
+      bio: 'Demo user for testing purposes'
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+};

@@ -8,6 +8,7 @@ import Customers from '@/pages/Customers';
 import Products from '@/pages/Products';
 import Orders from '@/pages/Orders';
 import Settings from '@/pages/Settings';
+import Admin from '@/pages/Admin';
 import Login from '@/pages/Login';
 import AuthGuard from '@/components/AuthGuard';
 import { Toaster } from '@/components/ui/toaster';
@@ -49,6 +50,14 @@ function App() {
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
             <Route path="settings" element={<Settings />} />
+            <Route 
+              path="admin" 
+              element={
+                <AuthGuard requiredRole="super_admin" fallbackPath="/">
+                  <Admin />
+                </AuthGuard>
+              } 
+            />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
