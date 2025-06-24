@@ -17,14 +17,14 @@ const Header = ({ title }) => {
     .slice(0, 2);
 
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
-      <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+    <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between shadow-sm">
+      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
       
       <div className="flex items-center space-x-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input 
-            className="pl-10 w-64 bg-gray-50 border-gray-200 focus:bg-white" 
+            className="pl-10 w-64 bg-gray-50 border-gray-200 focus:bg-white focus:border-orange-300 focus:ring-orange-200" 
             placeholder="Search..." 
           />
         </div>
@@ -33,7 +33,7 @@ const Header = ({ title }) => {
         
         <div className="flex items-center space-x-2">
           <Avatar className="h-8 w-8 border border-gray-200">
-            <AvatarFallback className="bg-indigo-100 text-indigo-800">
+            <AvatarFallback className="bg-orange-100 text-orange-700">
               {initials}
             </AvatarFallback>
           </Avatar>

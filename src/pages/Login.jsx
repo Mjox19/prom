@@ -164,16 +164,22 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-900 to-blue-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">QuoteSales Pro</h1>
-          <p className="text-blue-200">Your complete sales management solution</p>
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logo promocups Normal.png" 
+              alt="Promocups" 
+              className="h-12 w-auto"
+            />
+          </div>
+          <p className="text-gray-600">Your complete sales management solution</p>
         </div>
         
-        <Card>
+        <Card className="border border-gray-200 shadow-lg">
           <CardHeader>
-            <CardTitle>Welcome Back</CardTitle>
+            <CardTitle className="text-gray-900">Welcome Back</CardTitle>
             <CardDescription>Sign in to your account or create a new one</CardDescription>
           </CardHeader>
           <CardContent>
@@ -188,6 +194,7 @@ const Login = () => {
                   placeholder="Enter your email"
                   required
                   disabled={loading}
+                  className="focus:border-orange-300 focus:ring-orange-200"
                 />
               </div>
               <div className="space-y-2">
@@ -200,11 +207,12 @@ const Login = () => {
                   placeholder="Enter your password"
                   required
                   disabled={loading}
+                  className="focus:border-orange-300 focus:ring-orange-200"
                 />
                 <Button
                   type="button"
                   variant="link"
-                  className="px-0 text-sm"
+                  className="px-0 text-sm text-orange-600 hover:text-orange-700"
                   onClick={handlePasswordReset}
                   disabled={loading}
                 >
@@ -215,7 +223,7 @@ const Login = () => {
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <Button
-              className="w-full"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white"
               onClick={handleLogin}
               disabled={loading}
             >
@@ -231,7 +239,7 @@ const Login = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
               onClick={handleSignUp}
               disabled={loading}
             >
