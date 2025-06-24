@@ -76,10 +76,9 @@ const Settings = () => {
         if (profileError) throw profileError;
 
         if (profileData) {
-          const names = profileData.full_name ? profileData.full_name.split(' ') : [formData.firstName, formData.lastName];
           setFormData({
-            firstName: names[0] || '',
-            lastName: names.slice(1).join(' ') || '',
+            firstName: profileData.first_name || '',
+            lastName: profileData.last_name || '',
             email: user.email,
             bio: profileData.bio || formData.bio
           });
@@ -138,7 +137,9 @@ const Settings = () => {
           .from('profiles')
           .upsert({
             id: user.id,
-            full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            email: formData.email,
             bio: formData.bio,
             updated_at: new Date().toISOString()
           });
