@@ -73,7 +73,7 @@ const defaultTemplates = {
         <p><strong>Quote Number:</strong> {{quote_number}}</p>
         <p><strong>Company:</strong> {{company_name}}</p>
         <p><strong>Valid Until:</strong> {{valid_until}}</p>
-        <p><strong>Total Amount:</strong> \\${{total_amount}}</p>
+        <p><strong>Total Amount:</strong> &dollar;{{total_amount}}</p>
       </div>
       
       <p>{{quote_description}}</p>
@@ -125,7 +125,7 @@ const defaultTemplates = {
         <p><strong>Order Number:</strong> {{order_number}}</p>
         <p><strong>Company:</strong> {{company_name}}</p>
         <p><strong>Order Date:</strong> {{order_date}}</p>
-        <p><strong>Total Amount:</strong> \\${{total_amount}}</p>
+        <p><strong>Total Amount:</strong> &dollar;{{total_amount}}</p>
         <p><strong>Status:</strong> <span class="status-badge">{{order_status}}</span></p>
         <p><strong>Estimated Delivery:</strong> {{estimated_delivery}}</p>
       </div>
