@@ -667,6 +667,4 @@ const TemplateEditor = ({ template, onSave, onCancel, loading }) => {
   );
 };
 
-export default EmailTemplates;
-
 export default EmailTemplates
