@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, Package, Truck, Shield } from 'lucide-react';
+import { BarChart3, FileText, Users, TrendingUp, Settings, HelpCircle, Package, Truck, Shield, Mail } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 
 const Sidebar = () => {
@@ -16,6 +16,7 @@ const Sidebar = () => {
     { icon: Users, label: "Customers", path: "/customers" },
     { icon: Package, label: "Products", path: "/products" },
     { icon: Truck, label: "Orders & Deliveries", path: "/orders" },
+    { icon: Mail, label: "Email Templates", path: "/email-templates" },
     { icon: Settings, label: "Settings", path: "/settings" },
     // Only show admin panel for super admins
     ...(isSuperAdmin() ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : [])
