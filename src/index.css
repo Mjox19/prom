@@ -169,3 +169,7 @@
 .status-ordered {
   @apply bg-green-100 text-green-800;
 }
+
+.h-8 {
+  height: auto;
+}

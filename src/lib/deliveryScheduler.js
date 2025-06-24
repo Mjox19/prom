@@ -127,8 +127,8 @@ if (typeof window !== 'undefined') {
     deliveryScheduler.start();
   }, 5000);
 
-  // Stop the scheduler when the page is about to unload
-  window.addEventListener('beforeunload', () => {
-    deliveryScheduler.stop();
-  });
+  // // Stop the scheduler when the page is about to unload
+  // window.addEventListener('beforeunload', () => {
+  //   deliveryScheduler.stop();
+  // });
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const AuthContext = createContext({});
@@ -7,28 +7,104 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Auto-logout configuration
+  const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+  const WARNING_TIME = 5 * 60 * 1000; // Show warning 5 minutes before logout
+  
+  const timeoutRef = useRef(null);
+  const warningTimeoutRef = useRef(null);
+  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+
+  // Reset the inactivity timer
+  const resetInactivityTimer = useCallback(() => {
+    // Clear existing timers
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    
+    // Hide warning if it's showing
+    setShowInactivityWarning(false);
+    
+    // Only set timer if user is logged in
+    if (user) {
+      // Set warning timer
+      warningTimeoutRef.current = setTimeout(() => {
+        setShowInactivityWarning(true);
+      }, INACTIVITY_TIMEOUT - WARNING_TIME);
+      
+      // Set logout timer
+      timeoutRef.current = setTimeout(() => {
+        handleInactivityLogout();
+      }, INACTIVITY_TIMEOUT);
+    }
+  }, [user]);
+
+  // Handle automatic logout due to inactivity
+  const handleInactivityLogout = useCallback(async () => {
+    console.log('Auto-logout due to inactivity');
+    setShowInactivityWarning(false);
+    
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    
+    // Optional: Show a notification to the user
+    if (typeof window !== 'undefined' && window.alert) {
+      alert('You have been logged out due to inactivity.');
+    }
+  }, []);
+
+  // Extend session (called when user dismisses warning)
+  const extendSession = useCallback(() => {
+    resetInactivityTimer();
+  }, [resetInactivityTimer]);
+
+  // Set up activity listeners
+  useEffect(() => {
+    if (!user) return;
+
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
+
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    // Add event listeners
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+
+    // Start the timer
+    resetInactivityTimer();
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, [user, resetInactivityTimer]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      // Use demo user when Supabase is not configured
-      console.log('Using demo user - Supabase not configured');
-      const demoUser = {
-        id: '00000000-0000-0000-0000-000000000000',
-        email: 'demo@example.com',
-        first_name: 'Demo',
-        last_name: 'User'
-      };
-      const demoProfile = {
-        id: '00000000-0000-0000-0000-000000000000',
-        email: 'demo@example.com',
-        first_name: 'Demo',
-        last_name: 'User',
-        full_name: 'Demo User',
-        role: 'super_admin', // Demo user is super admin
-        bio: 'Demo user for testing purposes'
-      };
-      setUser(demoUser);
-      setUserProfile(demoProfile);
+      console.error('Supabase is not configured. Please check your .env.local file.');
       setLoading(false);
       return;
     }
@@ -43,6 +119,9 @@ export const AuthProvider = ({ children }) => {
       }
       
       setLoading(false);
+    }).catch((error) => {
+      console.error('Error getting session:', error);
+      setLoading(false);
     });
 
     // Listen for changes on auth state (sign in, sign out, etc.)
@@ -54,6 +133,14 @@ export const AuthProvider = ({ children }) => {
         await fetchUserProfile(currentUser.id);
       } else {
         setUserProfile(null);
+        // Clear timers when user logs out
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        if (warningTimeoutRef.current) {
+          clearTimeout(warningTimeoutRef.current);
+        }
+        setShowInactivityWarning(false);
       }
       
       setLoading(false);
@@ -97,16 +184,23 @@ export const AuthProvider = ({ children }) => {
       return response;
     },
     signOut: () => {
+      // Clear inactivity timers
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+      setShowInactivityWarning(false);
+      
       if (!isSupabaseConfigured) {
-        return Promise.resolve();
+        throw new Error('Supabase not configured');
       }
       return supabase.auth.signOut();
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {
-        // Update demo profile
-        setUserProfile(prev => ({ ...prev, ...updates }));
-        return { data: userProfile, error: null };
+        throw new Error('Supabase not configured');
       }
       
       try {
@@ -161,6 +255,10 @@ export const AuthProvider = ({ children }) => {
     user,
     userProfile,
     loading,
+    // Inactivity-related functions and state
+    showInactivityWarning,
+    extendSession,
+    resetInactivityTimer,
     // Helper functions for role checking
     isSuperAdmin: () => userProfile?.role === 'super_admin',
     isAdmin: () => userProfile?.role === 'admin' || userProfile?.role === 'super_admin',
@@ -172,7 +270,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
