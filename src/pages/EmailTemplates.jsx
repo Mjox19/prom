@@ -254,32 +254,30 @@ const EmailTemplates = () => {
     try {
       setLoading(true);
       
+      // Always update local state first for immediate preview updates
+      setTemplates(prev => ({
+        ...prev,
+        [templateData.type]: {
+          name: templateData.name,
+          subject: templateData.subject,
+          html: templateData.html
+        }
+      }));
+      
       if (!isSupabaseConfigured) {
-        // Demo mode - update local state
-        setTemplates(prev => ({
-          ...prev,
-          [templateData.type]: {
-            name: templateData.name,
-            subject: templateData.subject,
-            html: templateData.html
-          }
-        }));
-        
+        // Demo mode - only local state update needed
         toast({
           title: "Template Saved (Demo Mode)",
           description: "Email template has been saved to local storage."
         });
-        
-        setIsEditorOpen(false);
-        setEditingTemplate(null);
-        return;
+      } else {
+        // In a real implementation, save to Supabase here
+        // For now, we'll just show a message that it's saved locally
+        toast({
+          title: "Template Saved",
+          description: "Email template has been saved locally. Full Supabase integration coming soon."
+        });
       }
-
-      // In a real implementation, save to Supabase
-      toast({
-        title: "Template Saved",
-        description: "Email template has been saved successfully."
-      });
       
       setIsEditorOpen(false);
       setEditingTemplate(null);
