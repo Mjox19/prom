@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const warningTimeoutRef = useRef(null);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
   const authStateInitialized = useRef(false);
+  const sessionChecked = useRef(false);
 
   // Reset the inactivity timer
   const resetInactivityTimer = useCallback(() => {
@@ -133,6 +134,7 @@ export const AuthProvider = ({ children }) => {
         // Get current session
         console.log('🔍 Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
+        sessionChecked.current = true;
         
         if (error) {
           console.error('❌ Error getting session:', error);
@@ -230,8 +232,19 @@ export const AuthProvider = ({ children }) => {
       document.addEventListener(event, handleActivity, true);
     });
 
+    // Set a timeout to ensure we don't get stuck in loading state
+    const initTimeout = setTimeout(() => {
+      if (mounted && !sessionChecked.current) {
+        console.warn('⚠️ Session check timed out, forcing initialization');
+        setLoading(false);
+        setInitialized(true);
+        setConfigError('Authentication service timed out. Please try again.');
+      }
+    }, 10000); // 10 second timeout
+
     return () => {
       mounted = false;
+      clearTimeout(initTimeout);
       
       // Clean up auth listener
       if (authListener) {

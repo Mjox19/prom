@@ -17,7 +17,7 @@ const isSupabaseConfigured = supabaseUrl &&
 
 console.log('isSupabaseConfigured:', isSupabaseConfigured);
 
-// Define storage options
+// Define storage options with a custom key to avoid conflicts
 const storageOptions = {
   autoRefreshToken: true,
   persistSession: true,
@@ -30,9 +30,19 @@ let supabase;
 
 try {
   if (isSupabaseConfigured) {
-    // Use real Supabase client
+    // Use real Supabase client with explicit storage options
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: storageOptions
+      auth: storageOptions,
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      },
+      global: {
+        headers: {
+          'x-application-name': 'promocups-sales-management'
+        }
+      }
     });
     console.log('✅ Supabase client created successfully');
   } else {

@@ -15,7 +15,7 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
   });
 
   // Show loading state only if we're still initializing
-  if (!initialized) {
+  if (loading || !initialized) {
     console.log('⏳ AuthGuard: Still initializing...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">

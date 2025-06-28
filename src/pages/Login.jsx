@@ -129,8 +129,8 @@ const Login = () => {
 
       if (error) throw error;
 
-      const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      // Force a page reload to ensure clean state
+      window.location.href = location.state?.from?.pathname || '/';
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -138,7 +138,6 @@ const Login = () => {
         description: error.message || "Invalid email or password. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -184,6 +183,7 @@ const Login = () => {
         title: "Success",
         description: "Account created successfully. You can now sign in.",
       });
+      setLoading(false);
     } catch (error) {
       console.error('Signup error:', error);
       
@@ -201,7 +201,6 @@ const Login = () => {
           variant: "destructive"
         });
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -228,6 +227,7 @@ const Login = () => {
         title: "Password Reset Email Sent",
         description: "Check your email for the password reset link.",
       });
+      setLoading(false);
     } catch (error) {
       console.error('Password reset error:', error);
       toast({
@@ -235,7 +235,6 @@ const Login = () => {
         description: error.message || "Failed to send reset email. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };
