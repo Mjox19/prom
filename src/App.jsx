@@ -37,7 +37,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
-            path="/"
+            path="/*"
             element={
               <AuthGuard>
                 <Layout />
@@ -61,7 +61,6 @@ function App() {
               } 
             />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster />
       </Router>

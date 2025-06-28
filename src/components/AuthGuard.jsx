@@ -11,11 +11,12 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
     loading, 
     initialized, 
     userRole: userProfile?.role,
-    hasConfigError: !!configError 
+    hasConfigError: !!configError,
+    pathname: location.pathname
   });
 
   // Show loading state only if we're still initializing
-  if (loading || !initialized) {
+  if (!initialized || loading) {
     console.log('⏳ AuthGuard: Still initializing...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">

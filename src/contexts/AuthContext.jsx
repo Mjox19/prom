@@ -17,8 +17,8 @@ export const AuthProvider = ({ children }) => {
   const timeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
-  const authStateInitialized = useRef(false);
-  const sessionChecked = useRef(false);
+  const initializationRef = useRef(false);
+  const mountedRef = useRef(true);
 
   // Reset the inactivity timer
   const resetInactivityTimer = useCallback(() => {
@@ -57,8 +57,6 @@ export const AuthProvider = ({ children }) => {
     if (isSupabaseConfigured) {
       try {
         await supabase.auth.signOut();
-        // Force page reload to clear any cached state
-        window.location.href = '/login';
       } catch (error) {
         console.error('Error during auto-logout:', error);
       }
@@ -72,7 +70,7 @@ export const AuthProvider = ({ children }) => {
 
   // Fetch user profile from Supabase
   const fetchUserProfile = useCallback(async (userId) => {
-    if (!userId) return null;
+    if (!userId || !mountedRef.current) return null;
     
     console.log('📋 Fetching user profile for:', userId);
     
@@ -87,7 +85,9 @@ export const AuthProvider = ({ children }) => {
         role: 'super_admin',
         bio: 'Demo user for testing purposes'
       };
-      setUserProfile(demoProfile);
+      if (mountedRef.current) {
+        setUserProfile(demoProfile);
+      }
       return demoProfile;
     }
 
@@ -104,7 +104,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('Profile fetched successfully:', profile);
-      setUserProfile(profile);
+      if (mountedRef.current) {
+        setUserProfile(profile);
+      }
       return profile;
     } catch (error) {
       console.error('Exception fetching user profile:', error);
@@ -114,16 +116,23 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth state
   useEffect(() => {
-    let mounted = true;
-    let authListener = null;
-
+    mountedRef.current = true;
+    
     const initAuth = async () => {
+      // Prevent multiple initializations
+      if (initializationRef.current) {
+        console.log('🔄 Auth already initializing, skipping...');
+        return;
+      }
+      
+      initializationRef.current = true;
+      
       try {
         console.log('🔄 Initializing auth...', { isSupabaseConfigured });
         
         if (!isSupabaseConfigured) {
           console.warn('⚠️ Supabase not configured, using demo mode');
-          if (mounted) {
+          if (mountedRef.current) {
             setConfigError('Supabase configuration is missing or invalid');
             setLoading(false);
             setInitialized(true);
@@ -131,14 +140,13 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Get current session
+        // Get current session without triggering auth state changes
         console.log('🔍 Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
-        sessionChecked.current = true;
         
         if (error) {
           console.error('❌ Error getting session:', error);
-          if (mounted) {
+          if (mountedRef.current) {
             setConfigError(`Authentication error: ${error.message}`);
             setLoading(false);
             setInitialized(true);
@@ -149,32 +157,32 @@ export const AuthProvider = ({ children }) => {
         const session = data?.session;
         const currentUser = session?.user || null;
         
-        if (mounted) {
+        if (mountedRef.current) {
           if (currentUser) {
-            console.log('🔄 Auth state changed: SIGNED_IN', { hasUser: !!currentUser, userId: currentUser.id });
+            console.log('✅ Found existing session for user:', currentUser.id);
             setUser(currentUser);
             await fetchUserProfile(currentUser.id);
           } else {
-            console.log('🔄 Auth state: NO_SESSION');
+            console.log('ℹ️ No existing session found');
             setUser(null);
             setUserProfile(null);
           }
           
           setLoading(false);
           setInitialized(true);
-          authStateInitialized.current = true;
         }
 
-        // Set up auth state change listener
-        if (mounted) {
+        // Set up auth state change listener AFTER initial state is set
+        if (mountedRef.current) {
           console.log('🔗 Setting up auth state listener...');
           const { data: authData } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('🔄 Auth state changed:', event, { hasUser: !!session?.user });
+            console.log('🔄 Auth state changed:', event, { hasSession: !!session });
             
-            if (!mounted) return;
+            if (!mountedRef.current) return;
             
             const user = session?.user || null;
             
+            // Batch state updates to prevent multiple re-renders
             if (user) {
               setUser(user);
               await fetchUserProfile(user.id);
@@ -193,29 +201,22 @@ export const AuthProvider = ({ children }) => {
               }
               setShowInactivityWarning(false);
             }
-            
-            if (!authStateInitialized.current) {
-              setInitialized(true);
-              authStateInitialized.current = true;
-            }
-            
-            setLoading(false);
           });
           
-          authListener = authData.subscription;
+          // Store the unsubscribe function
+          return authData.subscription;
         }
       } catch (error) {
         console.error('❌ Error in auth initialization:', error);
-        if (mounted) {
+        if (mountedRef.current) {
           setConfigError(`Initialization error: ${error.message}`);
           setLoading(false);
           setInitialized(true);
-          authStateInitialized.current = true;
         }
       }
     };
 
-    initAuth();
+    const authSubscription = initAuth();
 
     // Set up activity listeners for inactivity timeout
     const activityEvents = [
@@ -223,37 +224,30 @@ export const AuthProvider = ({ children }) => {
     ];
 
     const handleActivity = () => {
-      if (user) {
+      if (user && mountedRef.current) {
         resetInactivityTimer();
       }
     };
 
     activityEvents.forEach(event => {
-      document.addEventListener(event, handleActivity, true);
+      document.addEventListener(event, handleActivity, { passive: true });
     });
 
-    // Set a timeout to ensure we don't get stuck in loading state
-    const initTimeout = setTimeout(() => {
-      if (mounted && !sessionChecked.current) {
-        console.warn('⚠️ Session check timed out, forcing initialization');
-        setLoading(false);
-        setInitialized(true);
-        setConfigError('Authentication service timed out. Please try again.');
-      }
-    }, 10000); // 10 second timeout
-
     return () => {
-      mounted = false;
-      clearTimeout(initTimeout);
+      mountedRef.current = false;
       
       // Clean up auth listener
-      if (authListener) {
-        authListener.unsubscribe();
+      if (authSubscription && typeof authSubscription.then === 'function') {
+        authSubscription.then(subscription => {
+          if (subscription && subscription.unsubscribe) {
+            subscription.unsubscribe();
+          }
+        });
       }
       
       // Clean up activity listeners
       activityEvents.forEach(event => {
-        document.removeEventListener(event, handleActivity, true);
+        document.removeEventListener(event, handleActivity);
       });
       
       // Clean up timers
@@ -264,7 +258,7 @@ export const AuthProvider = ({ children }) => {
         clearTimeout(warningTimeoutRef.current);
       }
     };
-  }, [fetchUserProfile, resetInactivityTimer, user]);
+  }, []); // Empty dependency array to run only once
 
   // Auth context value
   const value = {
@@ -298,14 +292,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Supabase not configured');
       }
       
-      try {
-        await supabase.auth.signOut();
-        // Force reload to clear any cached state
-        window.location.href = '/login';
-      } catch (error) {
-        console.error('Error signing out:', error);
-        throw error;
-      }
+      return supabase.auth.signOut();
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {

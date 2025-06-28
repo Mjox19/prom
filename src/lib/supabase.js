@@ -23,7 +23,7 @@ const storageOptions = {
   persistSession: true,
   detectSessionInUrl: false,
   storageKey: 'promocups-auth-storage',
-  debug: true
+  debug: false // Disable debug to reduce console noise
 };
 
 let supabase;

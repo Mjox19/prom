@@ -21,17 +21,18 @@ const Login = () => {
   console.log('🔐 Login component state:', { 
     hasUser: !!user, 
     initialized, 
-    hasConfigError: !!configError 
+    hasConfigError: !!configError,
+    pathname: location.pathname
   });
 
   // Redirect if already authenticated and auth is initialized
   useEffect(() => {
-    if (initialized && user) {
+    if (initialized && user && !configError) {
       console.log('✅ User already authenticated, redirecting...');
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, initialized, navigate, location]);
+  }, [user, initialized, configError, navigate, location]);
 
   // Don't render login form if we're still checking auth
   if (!initialized) {
@@ -47,7 +48,7 @@ const Login = () => {
   }
 
   // If user is authenticated, don't render anything (will redirect via useEffect)
-  if (user) {
+  if (user && !configError) {
     console.log('✅ User authenticated, will redirect...');
     return null;
   }
@@ -129,8 +130,8 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Force a page reload to ensure clean state
-      window.location.href = location.state?.from?.pathname || '/';
+      // Don't force reload, let the auth state change handle navigation
+      console.log('✅ Login successful, auth state will handle navigation');
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -138,6 +139,7 @@ const Login = () => {
         description: error.message || "Invalid email or password. Please try again.",
         variant: "destructive"
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -183,7 +185,6 @@ const Login = () => {
         title: "Success",
         description: "Account created successfully. You can now sign in.",
       });
-      setLoading(false);
     } catch (error) {
       console.error('Signup error:', error);
       
@@ -201,6 +202,7 @@ const Login = () => {
           variant: "destructive"
         });
       }
+    } finally {
       setLoading(false);
     }
   };
@@ -227,7 +229,6 @@ const Login = () => {
         title: "Password Reset Email Sent",
         description: "Check your email for the password reset link.",
       });
-      setLoading(false);
     } catch (error) {
       console.error('Password reset error:', error);
       toast({
@@ -235,6 +236,7 @@ const Login = () => {
         description: error.message || "Failed to send reset email. Please try again.",
         variant: "destructive"
       });
+    } finally {
       setLoading(false);
     }
   };
