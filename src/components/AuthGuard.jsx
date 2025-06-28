@@ -6,16 +6,17 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
   const { user, userProfile, loading, initialized, configError } = useAuth();
   const location = useLocation();
 
-  console.log('AuthGuard state:', { 
+  console.log('🛡️ AuthGuard state:', { 
     hasUser: !!user, 
     loading, 
     initialized, 
     userRole: userProfile?.role,
-    configError: !!configError
+    hasConfigError: !!configError
   });
 
   // Show loading only if we haven't initialized yet
   if (!initialized) {
+    console.log('⏳ AuthGuard: Still initializing...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -28,12 +29,13 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
 
   // If there's a configuration error, redirect to login to show the error
   if (configError) {
+    console.log('❌ AuthGuard: Configuration error, redirecting to login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // If no user and we've finished initializing, redirect to login
   if (!user) {
-    console.log('No user found, redirecting to login');
+    console.log('🚫 AuthGuard: No user found, redirecting to login');
     // Save the attempted URL for redirecting after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -54,11 +56,12 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
     };
 
     if (!hasRequiredRole()) {
-      console.log('User does not have required role:', requiredRole);
+      console.log('🚫 AuthGuard: User does not have required role:', requiredRole);
       return <Navigate to={fallbackPath} replace />;
     }
   }
 
+  console.log('✅ AuthGuard: Access granted');
   return children;
 };
 

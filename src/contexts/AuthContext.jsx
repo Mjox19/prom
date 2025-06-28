@@ -104,67 +104,111 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user, resetInactivityTimer, initialized]);
 
+  const fetchUserProfile = async (userId) => {
+    if (!isSupabaseConfigured) {
+      return;
+    }
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth...', { isSupabaseConfigured });
+        console.log('🔄 Initializing auth...', { isSupabaseConfigured });
+        
+        // Always set initialized to true, regardless of Supabase config
+        // This prevents infinite loading loops
         
         if (!isSupabaseConfigured) {
-          console.error('Supabase is not configured properly');
+          console.error('❌ Supabase is not configured properly');
           if (mounted) {
             setConfigError('Supabase configuration is missing or invalid. Please check your environment variables.');
+            setUser(null);
+            setUserProfile(null);
             setLoading(false);
-            setInitialized(true);
+            setInitialized(true); // CRITICAL: Always set initialized to true
           }
           return;
         }
 
         // Check active sessions
+        console.log('🔍 Checking for existing session...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('❌ Error getting session:', error);
           if (mounted) {
             setConfigError(`Authentication error: ${error.message}`);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            setInitialized(true); // CRITICAL: Always set initialized to true
           }
+          return;
         }
 
         const currentUser = session?.user ?? null;
-        console.log('Initial session check:', { userId: currentUser?.id });
+        console.log('👤 Session check result:', { 
+          hasUser: !!currentUser, 
+          userId: currentUser?.id 
+        });
         
         if (mounted) {
           setUser(currentUser);
           
           if (currentUser) {
+            console.log('📋 Fetching user profile...');
             await fetchUserProfile(currentUser.id);
           }
           
           setLoading(false);
-          setInitialized(true);
+          setInitialized(true); // CRITICAL: Always set initialized to true
+          console.log('✅ Auth initialization complete');
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('💥 Error initializing auth:', error);
         if (mounted) {
           setConfigError(`Initialization error: ${error.message}`);
           setUser(null);
           setUserProfile(null);
           setLoading(false);
-          setInitialized(true);
+          setInitialized(true); // CRITICAL: Always set initialized to true
         }
       }
     };
 
+    // Start initialization immediately
     initializeAuth();
 
     // Only set up auth listener if Supabase is configured
     let subscription = null;
     if (isSupabaseConfigured) {
+      console.log('🔗 Setting up auth state listener...');
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (!mounted) return;
 
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('🔄 Auth state changed:', event, { 
+          hasUser: !!session?.user,
+          userId: session?.user?.id 
+        });
         
         const currentUser = session?.user ?? null;
         setUser(currentUser);
@@ -193,30 +237,7 @@ export const AuthProvider = ({ children }) => {
         subscription.unsubscribe();
       }
     };
-  }, []);
-
-  const fetchUserProfile = async (userId) => {
-    if (!isSupabaseConfigured) {
-      return;
-    }
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return;
-      }
-
-      setUserProfile(profile);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  };
+  }, []); // Empty dependency array - only run once on mount
 
   const value = {
     signUp: async (data) => {

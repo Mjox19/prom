@@ -18,16 +18,24 @@ const Login = () => {
   const location = useLocation();
   const { user, initialized, signIn, configError } = useAuth();
 
+  console.log('🔐 Login component state:', { 
+    hasUser: !!user, 
+    initialized, 
+    hasConfigError: !!configError 
+  });
+
   // Redirect if already authenticated and auth is initialized
   useEffect(() => {
     if (initialized && user) {
+      console.log('✅ User already authenticated, redirecting...');
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
   }, [user, initialized, navigate, location]);
 
-  // Don't render login form if we're still checking auth or user is already logged in
+  // Don't render login form if we're still checking auth
   if (!initialized) {
+    console.log('⏳ Login: Waiting for auth initialization...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -38,12 +46,15 @@ const Login = () => {
     );
   }
 
+  // If user is authenticated, don't render anything (will redirect via useEffect)
   if (user) {
-    return null; // Will redirect via useEffect
+    console.log('✅ User authenticated, will redirect...');
+    return null;
   }
 
   // Show configuration error if Supabase is not configured
   if (configError) {
+    console.log('❌ Showing configuration error');
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -228,6 +239,8 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  console.log('🔐 Rendering login form');
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
