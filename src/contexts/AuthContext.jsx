@@ -106,10 +106,21 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId) => {
     if (!isSupabaseConfigured) {
+      console.log('📋 Demo mode: Using mock profile data');
+      setUserProfile({
+        id: userId,
+        email: 'demo@example.com',
+        first_name: 'Demo',
+        last_name: 'User',
+        full_name: 'Demo User',
+        role: 'super_admin',
+        bio: 'Demo user for testing purposes'
+      });
       return;
     }
 
     try {
+      console.log('📋 Fetching user profile for:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -117,13 +128,14 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        console.error('❌ Error fetching user profile:', error);
         return;
       }
 
+      console.log('✅ Profile fetched successfully:', profile);
       setUserProfile(profile);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('💥 Exception fetching user profile:', error);
     }
   };
 
@@ -133,9 +145,6 @@ export const AuthProvider = ({ children }) => {
     const initializeAuth = async () => {
       try {
         console.log('🔄 Initializing auth...', { isSupabaseConfigured });
-        
-        // Always set initialized to true, regardless of Supabase config
-        // This prevents infinite loading loops
         
         if (!isSupabaseConfigured) {
           console.error('❌ Supabase is not configured properly');
