@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export const generateQuotePDF = (quote, customer) => {
   const doc = new jsPDF();

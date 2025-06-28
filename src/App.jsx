@@ -8,6 +8,7 @@ import Customers from '@/pages/Customers';
 import Products from '@/pages/Products';
 import Orders from '@/pages/Orders';
 import EmailTemplates from '@/pages/EmailTemplates';
+import EmailAdmin from '@/pages/EmailAdmin';
 import Settings from '@/pages/Settings';
 import Admin from '@/pages/Admin';
 import Login from '@/pages/Login';
@@ -51,6 +52,11 @@ function App() {
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
             <Route path="email-templates" element={<EmailTemplates />} />
+            <Route path="email-admin" element={
+              <AuthGuard requiredRole="super_admin" fallbackPath="/">
+                <EmailAdmin />
+              </AuthGuard>
+            } />
             <Route path="settings" element={<Settings />} />
             <Route 
               path="admin" 
