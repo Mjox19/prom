@@ -1,5 +1,3 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -117,7 +115,8 @@ const templates = {
   `
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -137,7 +136,7 @@ serve(async (req) => {
     }
 
     // Get the email template
-    const templateFunction = templates[template];
+    const templateFunction = templates[template as keyof typeof templates];
     if (!templateFunction) {
       throw new Error(`Template '${template}' not found`);
     }
