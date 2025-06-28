@@ -3,28 +3,12 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const AuthContext = createContext({});
 
-// Demo user for when Supabase is not configured
-const DEMO_USER = {
-  id: 'demo-user-id',
-  email: 'demo@promocups.com',
-  created_at: new Date().toISOString()
-};
-
-const DEMO_PROFILE = {
-  id: 'demo-user-id',
-  email: 'demo@promocups.com',
-  first_name: 'Demo',
-  last_name: 'User',
-  full_name: 'Demo User',
-  role: 'super_admin',
-  bio: 'Demo user for testing purposes'
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [configError, setConfigError] = useState(null);
   
   // Auto-logout configuration
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -47,8 +31,8 @@ export const AuthProvider = ({ children }) => {
     // Hide warning if it's showing
     setShowInactivityWarning(false);
     
-    // Only set timer if user is logged in
-    if (user) {
+    // Only set timer if user is logged in and Supabase is configured
+    if (user && isSupabaseConfigured) {
       // Set warning timer
       warningTimeoutRef.current = setTimeout(() => {
         setShowInactivityWarning(true);
@@ -68,10 +52,6 @@ export const AuthProvider = ({ children }) => {
     
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
-    } else {
-      // Demo mode logout
-      setUser(null);
-      setUserProfile(null);
     }
     
     // Optional: Show a notification to the user
@@ -87,7 +67,7 @@ export const AuthProvider = ({ children }) => {
 
   // Set up activity listeners
   useEffect(() => {
-    if (!user || !initialized) return;
+    if (!user || !initialized || !isSupabaseConfigured) return;
 
     const activityEvents = [
       'mousedown',
@@ -132,11 +112,9 @@ export const AuthProvider = ({ children }) => {
         console.log('Initializing auth...', { isSupabaseConfigured });
         
         if (!isSupabaseConfigured) {
-          console.log('Supabase not configured - using demo mode with auto-login');
-          // In demo mode, automatically log in the demo user
+          console.error('Supabase is not configured properly');
           if (mounted) {
-            setUser(DEMO_USER);
-            setUserProfile(DEMO_PROFILE);
+            setConfigError('Supabase configuration is missing or invalid. Please check your environment variables.');
             setLoading(false);
             setInitialized(true);
           }
@@ -148,6 +126,9 @@ export const AuthProvider = ({ children }) => {
         
         if (error) {
           console.error('Error getting session:', error);
+          if (mounted) {
+            setConfigError(`Authentication error: ${error.message}`);
+          }
         }
 
         const currentUser = session?.user ?? null;
@@ -166,6 +147,7 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
+          setConfigError(`Initialization error: ${error.message}`);
           setUser(null);
           setUserProfile(null);
           setLoading(false);
@@ -215,7 +197,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId) => {
     if (!isSupabaseConfigured) {
-      return DEMO_PROFILE;
+      return;
     }
 
     try {
@@ -239,17 +221,14 @@ export const AuthProvider = ({ children }) => {
   const value = {
     signUp: async (data) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured - demo mode active');
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       const response = await supabase.auth.signUp(data);
       return response;
     },
     signIn: async (data) => {
       if (!isSupabaseConfigured) {
-        // Demo mode - simulate successful login
-        setUser(DEMO_USER);
-        setUserProfile(DEMO_PROFILE);
-        return { data: { user: DEMO_USER }, error: null };
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       const response = await supabase.auth.signInWithPassword(data);
       return response;
@@ -265,19 +244,13 @@ export const AuthProvider = ({ children }) => {
       setShowInactivityWarning(false);
       
       if (!isSupabaseConfigured) {
-        // Demo mode logout
-        setUser(null);
-        setUserProfile(null);
-        return { error: null };
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       return supabase.auth.signOut();
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {
-        // Demo mode - simulate profile update
-        const updatedProfile = { ...userProfile, ...updates };
-        setUserProfile(updatedProfile);
-        return { data: updatedProfile, error: null };
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       
       try {
@@ -298,7 +271,7 @@ export const AuthProvider = ({ children }) => {
     },
     changeUserRole: async (targetUserId, newRole) => {
       if (!isSupabaseConfigured) {
-        return { success: true }; // Demo mode
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       
       try {
@@ -315,7 +288,7 @@ export const AuthProvider = ({ children }) => {
     },
     promoteToSuperAdmin: async (targetUserId) => {
       if (!isSupabaseConfigured) {
-        return { success: true }; // Demo mode
+        throw new Error('Supabase is not configured. Please check your environment variables.');
       }
       
       try {
@@ -333,6 +306,7 @@ export const AuthProvider = ({ children }) => {
     userProfile,
     loading,
     initialized,
+    configError,
     // Inactivity-related functions and state
     showInactivityWarning,
     extendSession,

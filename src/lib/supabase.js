@@ -34,24 +34,36 @@ if (!isSupabaseConfigured) {
   }
   
   console.error('Please check your .env.local file and ensure both variables are set correctly.');
-  throw new Error('Supabase is not properly configured. Please check your environment variables.');
 }
 
-// Create Supabase client
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
+// Create Supabase client even if not configured (will show error in UI)
+const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
   }
-});
+);
 
-console.log('✅ Supabase client created successfully');
+if (isSupabaseConfigured) {
+  console.log('✅ Supabase client created successfully');
+} else {
+  console.warn('⚠️ Supabase client created with placeholder values');
+}
 
 export { supabase, isSupabaseConfigured };
 
 // Real-time subscription helper
 export const subscribeToTable = (tableName, callback, filter = null) => {
+  if (!isSupabaseConfigured) {
+    console.log(`Demo mode: Would subscribe to ${tableName} changes`);
+    return () => {}; // Return empty cleanup function
+  }
+
   const channelName = `${tableName}-changes-${Date.now()}`;
   
   let subscription = supabase
@@ -84,6 +96,10 @@ export const generateQuoteNumber = () => {
 
 // Helper functions for role checking (can be used in components)
 export const checkUserRole = async (userId, requiredRole) => {
+  if (!isSupabaseConfigured) {
+    return true; // Demo mode - allow all actions
+  }
+
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -111,6 +127,18 @@ export const checkUserRole = async (userId, requiredRole) => {
 
 // Get user profile with role
 export const getUserProfile = async (userId) => {
+  if (!isSupabaseConfigured) {
+    return {
+      id: userId,
+      email: 'demo@example.com',
+      first_name: 'Demo',
+      last_name: 'User',
+      full_name: 'Demo User',
+      role: 'super_admin',
+      bio: 'Demo user for testing purposes'
+    };
+  }
+
   try {
     const { data, error } = await supabase
       .from('profiles')

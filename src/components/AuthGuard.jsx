@@ -3,14 +3,15 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) => {
-  const { user, userProfile, loading, initialized } = useAuth();
+  const { user, userProfile, loading, initialized, configError } = useAuth();
   const location = useLocation();
 
   console.log('AuthGuard state:', { 
     hasUser: !!user, 
     loading, 
     initialized, 
-    userRole: userProfile?.role 
+    userRole: userProfile?.role,
+    configError: !!configError
   });
 
   // Show loading only if we haven't initialized yet
@@ -23,6 +24,11 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
         </div>
       </div>
     );
+  }
+
+  // If there's a configuration error, redirect to login to show the error
+  if (configError) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // If no user and we've finished initializing, redirect to login
