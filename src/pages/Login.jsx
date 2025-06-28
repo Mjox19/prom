@@ -16,7 +16,7 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, initialized, signIn, configError } = useAuth();
+  const { user, initialized, configError } = useAuth();
 
   console.log('🔐 Login component state:', { 
     hasUser: !!user, 

@@ -235,6 +235,9 @@ export const AuthProvider = ({ children }) => {
           }
           setShowInactivityWarning(false);
         }
+        
+        // Ensure loading is false after auth state change
+        setLoading(false);
       });
       
       subscription = data.subscription;

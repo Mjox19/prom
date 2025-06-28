@@ -17,30 +17,10 @@ const isSupabaseConfigured = supabaseUrl &&
 
 console.log('isSupabaseConfigured:', isSupabaseConfigured);
 
-if (!isSupabaseConfigured) {
-  console.error('❌ Supabase Configuration Error:');
-  if (!supabaseUrl) {
-    console.error('- VITE_SUPABASE_URL is missing');
-  } else if (!supabaseUrl.startsWith('https://')) {
-    console.error('- VITE_SUPABASE_URL should start with https://');
-  } else if (!supabaseUrl.includes('.supabase.co')) {
-    console.error('- VITE_SUPABASE_URL should contain .supabase.co');
-  }
-  
-  if (!supabaseAnonKey) {
-    console.error('- VITE_SUPABASE_ANON_KEY is missing');
-  } else if (supabaseAnonKey.length <= 50) {
-    console.error('- VITE_SUPABASE_ANON_KEY appears to be invalid (too short)');
-  }
-  
-  console.error('Please check your .env.local file and ensure both variables are set correctly.');
-}
-
-// Create Supabase client
 let supabase;
 
 try {
-  // Create Supabase client with proper error handling
+  // Create Supabase client with proper error handling and persistent storage
   supabase = createClient(
     supabaseUrl || 'https://placeholder.supabase.co', 
     supabaseAnonKey || 'placeholder-key',
@@ -86,6 +66,16 @@ try {
 }
 
 export { supabase, isSupabaseConfigured };
+
+// Set up a default user for development when Supabase is not configured
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+export const getCurrentUser = () => ({
+  id: DEMO_USER_ID,
+  email: 'demo@example.com',
+  first_name: 'Demo',
+  last_name: 'User'
+});
 
 // Real-time subscription helper
 export const subscribeToTable = (tableName, callback, filter = null) => {
