@@ -174,7 +174,7 @@ const Login = () => {
               className="h-12 w-auto"
             />
           </div>
-          <p className="text-gray-600">Your complete sales management solution</p>
+          <p className="text-gray-600"></p>
         </div>
         
         <Card className="border border-gray-200 shadow-lg">
