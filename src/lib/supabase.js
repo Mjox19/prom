@@ -36,23 +36,53 @@ if (!isSupabaseConfigured) {
   console.error('Please check your .env.local file and ensure both variables are set correctly.');
 }
 
-// Create Supabase client even if not configured (will show error in UI)
-const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true
-    }
-  }
-);
+// Create Supabase client
+let supabase;
 
-if (isSupabaseConfigured) {
-  console.log('✅ Supabase client created successfully');
-} else {
-  console.warn('⚠️ Supabase client created with placeholder values');
+try {
+  // Create Supabase client with proper error handling
+  supabase = createClient(
+    supabaseUrl || 'https://placeholder.supabase.co', 
+    supabaseAnonKey || 'placeholder-key',
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        storageKey: 'promocups-auth-token',
+        storage: localStorage
+      }
+    }
+  );
+  
+  if (isSupabaseConfigured) {
+    console.log('✅ Supabase client created successfully');
+  } else {
+    console.warn('⚠️ Supabase client created with placeholder values');
+  }
+} catch (error) {
+  console.error('❌ Failed to create Supabase client:', error);
+  // Create a minimal client that won't throw errors but won't work either
+  supabase = {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      signUp: () => Promise.reject(new Error('Supabase client initialization failed')),
+      signInWithPassword: () => Promise.reject(new Error('Supabase client initialization failed')),
+      signOut: () => Promise.resolve({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+    },
+    from: () => ({
+      select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
+      insert: () => Promise.resolve({ data: null, error: null }),
+      update: () => Promise.resolve({ data: null, error: null }),
+      delete: () => Promise.resolve({ data: null, error: null })
+    }),
+    rpc: () => Promise.resolve({ data: null, error: null }),
+    removeChannel: () => {},
+    channel: () => ({
+      on: () => ({ subscribe: () => {} })
+    })
+  };
 }
 
 export { supabase, isSupabaseConfigured };
