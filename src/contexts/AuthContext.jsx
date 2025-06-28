@@ -23,16 +23,18 @@ export const AuthProvider = ({ children }) => {
     // Clear existing timers
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = null;
     }
     
     // Hide warning if it's showing
     setShowInactivityWarning(false);
     
-    // Only set timer if user is logged in and Supabase is configured
-    if (user && isSupabaseConfigured) {
+    // Only set timer if user is logged in
+    if (user) {
       // Set warning timer
       warningTimeoutRef.current = setTimeout(() => {
         setShowInactivityWarning(true);
@@ -51,12 +53,13 @@ export const AuthProvider = ({ children }) => {
     setShowInactivityWarning(false);
     
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    }
-    
-    // Optional: Show a notification to the user
-    if (typeof window !== 'undefined' && window.alert) {
-      alert('You have been logged out due to inactivity.');
+      try {
+        await supabase.auth.signOut();
+        // Force page reload to clear any cached state
+        window.location.href = '/login';
+      } catch (error) {
+        console.error('Error during auto-logout:', error);
+      }
     }
   }, []);
 
@@ -65,49 +68,13 @@ export const AuthProvider = ({ children }) => {
     resetInactivityTimer();
   }, [resetInactivityTimer]);
 
-  // Set up activity listeners
-  useEffect(() => {
-    if (!user || !initialized || !isSupabaseConfigured) return;
-
-    const activityEvents = [
-      'mousedown',
-      'mousemove',
-      'keypress',
-      'scroll',
-      'touchstart',
-      'click'
-    ];
-
-    const handleActivity = () => {
-      resetInactivityTimer();
-    };
-
-    // Add event listeners
-    activityEvents.forEach(event => {
-      document.addEventListener(event, handleActivity, true);
-    });
-
-    // Start the timer
-    resetInactivityTimer();
-
-    // Cleanup
-    return () => {
-      activityEvents.forEach(event => {
-        document.removeEventListener(event, handleActivity, true);
-      });
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-      }
-    };
-  }, [user, resetInactivityTimer, initialized]);
-
-  const fetchUserProfile = async (userId) => {
+  // Fetch user profile from Supabase
+  const fetchUserProfile = useCallback(async (userId) => {
+    if (!userId) return null;
+    
     if (!isSupabaseConfigured) {
-      console.log('📋 Demo mode: Using mock profile data');
-      setUserProfile({
+      console.log('Using demo profile for user:', userId);
+      const demoProfile = {
         id: userId,
         email: 'demo@example.com',
         first_name: 'Demo',
@@ -115,12 +82,13 @@ export const AuthProvider = ({ children }) => {
         full_name: 'Demo User',
         role: 'super_admin',
         bio: 'Demo user for testing purposes'
-      });
-      return;
+      };
+      setUserProfile(demoProfile);
+      return demoProfile;
     }
 
     try {
-      console.log('📋 Fetching user profile for:', userId);
+      console.log('Fetching profile for user:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -128,140 +96,164 @@ export const AuthProvider = ({ children }) => {
         .single();
 
       if (error) {
-        console.error('❌ Error fetching user profile:', error);
-        return;
+        console.error('Error fetching user profile:', error);
+        return null;
       }
 
-      console.log('✅ Profile fetched successfully:', profile);
+      console.log('Profile fetched successfully:', profile);
       setUserProfile(profile);
+      return profile;
     } catch (error) {
-      console.error('💥 Exception fetching user profile:', error);
+      console.error('Exception fetching user profile:', error);
+      return null;
     }
-  };
+  }, []);
 
+  // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let authListener = null;
 
-    const initializeAuth = async () => {
+    const initAuth = async () => {
       try {
-        console.log('🔄 Initializing auth...', { isSupabaseConfigured });
+        console.log('Initializing auth state...');
         
         if (!isSupabaseConfigured) {
-          console.error('❌ Supabase is not configured properly');
+          console.warn('Supabase not configured, using demo mode');
           if (mounted) {
-            setConfigError('Supabase configuration is missing or invalid. Please check your environment variables.');
-            setUser(null);
-            setUserProfile(null);
+            setConfigError('Supabase configuration is missing or invalid');
             setLoading(false);
-            setInitialized(true); // CRITICAL: Always set initialized to true
+            setInitialized(true);
           }
           return;
         }
 
-        // Check active sessions
-        console.log('🔍 Checking for existing session...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Get current session
+        const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ Error getting session:', error);
+          console.error('Error getting session:', error);
           if (mounted) {
             setConfigError(`Authentication error: ${error.message}`);
-            setUser(null);
-            setUserProfile(null);
             setLoading(false);
-            setInitialized(true); // CRITICAL: Always set initialized to true
+            setInitialized(true);
           }
           return;
         }
 
-        const currentUser = session?.user ?? null;
-        console.log('👤 Session check result:', { 
-          hasUser: !!currentUser, 
-          userId: currentUser?.id 
+        const session = data?.session;
+        const currentUser = session?.user || null;
+        
+        console.log('Session check result:', { 
+          hasSession: !!session, 
+          hasUser: !!currentUser 
         });
         
         if (mounted) {
           setUser(currentUser);
           
           if (currentUser) {
-            console.log('📋 Fetching user profile...');
             await fetchUserProfile(currentUser.id);
           }
           
           setLoading(false);
-          setInitialized(true); // CRITICAL: Always set initialized to true
-          console.log('✅ Auth initialization complete');
+          setInitialized(true);
+        }
+
+        // Set up auth state change listener
+        if (mounted) {
+          const { data: authData } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state changed:', event, { hasUser: !!session?.user });
+            
+            if (!mounted) return;
+            
+            const user = session?.user || null;
+            setUser(user);
+            
+            if (user) {
+              await fetchUserProfile(user.id);
+              resetInactivityTimer();
+            } else {
+              setUserProfile(null);
+              // Clear timers when user logs out
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+              }
+              if (warningTimeoutRef.current) {
+                clearTimeout(warningTimeoutRef.current);
+                warningTimeoutRef.current = null;
+              }
+              setShowInactivityWarning(false);
+            }
+            
+            setLoading(false);
+          });
+          
+          authListener = authData.subscription;
         }
       } catch (error) {
-        console.error('💥 Error initializing auth:', error);
+        console.error('Error in auth initialization:', error);
         if (mounted) {
           setConfigError(`Initialization error: ${error.message}`);
-          setUser(null);
-          setUserProfile(null);
           setLoading(false);
-          setInitialized(true); // CRITICAL: Always set initialized to true
+          setInitialized(true);
         }
       }
     };
 
-    // Start initialization immediately
-    initializeAuth();
+    initAuth();
 
-    // Only set up auth listener if Supabase is configured
-    let subscription = null;
-    if (isSupabaseConfigured) {
-      console.log('🔗 Setting up auth state listener...');
-      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!mounted) return;
+    // Set up activity listeners for inactivity timeout
+    const activityEvents = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'
+    ];
 
-        console.log('🔄 Auth state changed:', event, { 
-          hasUser: !!session?.user,
-          userId: session?.user?.id 
-        });
-        
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        
-        if (currentUser) {
-          await fetchUserProfile(currentUser.id);
-        } else {
-          setUserProfile(null);
-          // Clear timers when user logs out
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-          if (warningTimeoutRef.current) {
-            clearTimeout(warningTimeoutRef.current);
-          }
-          setShowInactivityWarning(false);
-        }
-        
-        // Ensure loading is false after auth state change
-        setLoading(false);
-      });
-      
-      subscription = data.subscription;
-    }
+    const handleActivity = () => {
+      if (user) {
+        resetInactivityTimer();
+      }
+    };
+
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
 
     return () => {
       mounted = false;
-      if (subscription) {
-        subscription.unsubscribe();
+      
+      // Clean up auth listener
+      if (authListener) {
+        authListener.unsubscribe();
+      }
+      
+      // Clean up activity listeners
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      
+      // Clean up timers
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
       }
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [fetchUserProfile, resetInactivityTimer, user]);
 
+  // Auth context value
   const value = {
     signUp: async (data) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
       const response = await supabase.auth.signUp(data);
       return response;
     },
     signIn: async (data) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
       const response = await supabase.auth.signInWithPassword(data);
       return response;
@@ -270,20 +262,30 @@ export const AuthProvider = ({ children }) => {
       // Clear inactivity timers
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
+        warningTimeoutRef.current = null;
       }
       setShowInactivityWarning(false);
       
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
-      return supabase.auth.signOut();
+      
+      try {
+        await supabase.auth.signOut();
+        // Force reload to clear any cached state
+        window.location.href = '/login';
+      } catch (error) {
+        console.error('Error signing out:', error);
+        throw error;
+      }
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
       
       try {
@@ -304,7 +306,7 @@ export const AuthProvider = ({ children }) => {
     },
     changeUserRole: async (targetUserId, newRole) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
       
       try {
@@ -321,7 +323,7 @@ export const AuthProvider = ({ children }) => {
     },
     promoteToSuperAdmin: async (targetUserId) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured. Please check your environment variables.');
+        throw new Error('Supabase not configured');
       }
       
       try {
