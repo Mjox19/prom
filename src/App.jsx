@@ -60,6 +60,7 @@ function App() {
                 </AuthGuard>
               } 
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
         <Toaster />

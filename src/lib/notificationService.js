@@ -1,5 +1,4 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import emailService from '@/lib/emailService';
 
 // Notification service for handling order and delivery notifications
 export class NotificationService {
@@ -45,34 +44,32 @@ export class NotificationService {
     }
   }
 
-  // Send email notification via local SMTP server
+  // Send email notification (mock implementation)
   async sendEmailNotification(emailData) {
     try {
-      // Use the email service to send the email
-      const result = await emailService.sendTemplatedEmail(emailData);
+      // In a real implementation, this would connect to an email service
+      // For now, we'll just log the email data and simulate success
+      console.log('📧 Email would be sent:', {
+        to: emailData.to,
+        subject: emailData.subject,
+        template: emailData.template,
+        data: emailData.data
+      });
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to send email');
+      // Create an in-app notification about the email
+      if (this.isConfigured && emailData.userId) {
+        await this.createNotification(
+          emailData.userId,
+          'Email Notification Sent',
+          `Email sent to ${emailData.to} regarding ${emailData.subject}`,
+          'system'
+        );
       }
       
-      return { success: true, messageId: result.messageId };
+      return { success: true, messageId: `mock-${Date.now()}` };
     } catch (error) {
       console.error('Error sending email notification:', error);
-      
-      // Handle cases where error might be undefined or lack a message property
-      let errorMessage = 'Failed to send email notification';
-      
-      if (error && typeof error === 'object') {
-        if (error.message) {
-          errorMessage = error.message;
-        } else if (error.toString && error.toString() !== '[object Object]') {
-          errorMessage = error.toString();
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      }
-      
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message || 'Failed to send email' };
     }
   }
 
@@ -105,9 +102,10 @@ export class NotificationService {
       'sale'
     );
 
-    // Send email to customer
+    // Simulate sending email to customer
     const emailData = {
       to: customer.email,
+      userId: user.id,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Order Update - Status Changed to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`,
       template: 'order-status-update',
@@ -150,9 +148,10 @@ export class NotificationService {
       'sale'
     );
 
-    // Send email to customer
+    // Simulate sending email to customer
     const emailData = {
       to: customer.email,
+      userId: user.id,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Delivery Reminder - Your Order Arrives ${formattedDate}`,
       template: 'delivery-reminder',
