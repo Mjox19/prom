@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import emailService from '@/lib/emailService';
 
 // Notification service for handling order and delivery notifications
 export class NotificationService {
@@ -44,25 +45,22 @@ export class NotificationService {
     }
   }
 
-  // Send email notification via edge function
+  // Send email notification via local SMTP server
   async sendEmailNotification(emailData) {
-    if (!this.isConfigured) {
-      console.log('Demo email notification:', emailData);
-      return { success: true, demo: true };
-    }
-
     try {
-      const { data, error } = await supabase.functions.invoke('send-notification-email', {
-        body: emailData
-      });
-
-      if (error) throw error;
-      return { success: true, data };
+      // Use the email service to send the email
+      const result = await emailService.sendTemplatedEmail(emailData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+      
+      return { success: true, messageId: result.messageId };
     } catch (error) {
       console.error('Error sending email notification:', error);
       
       // Handle cases where error might be undefined or lack a message property
-      let errorMessage = 'Failed to send a request to the Edge Function. Check network or function deployment.';
+      let errorMessage = 'Failed to send email notification';
       
       if (error && typeof error === 'object') {
         if (error.message) {
@@ -108,7 +106,7 @@ export class NotificationService {
     );
 
     // Send email to customer
-    const customerEmailData = {
+    const emailData = {
       to: customer.email,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Order Update - Status Changed to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`,
@@ -126,7 +124,7 @@ export class NotificationService {
       }
     };
 
-    await this.sendEmailNotification(customerEmailData);
+    await this.sendEmailNotification(emailData);
 
     return { success: true };
   }
@@ -153,7 +151,7 @@ export class NotificationService {
     );
 
     // Send email to customer
-    const customerEmailData = {
+    const emailData = {
       to: customer.email,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Delivery Reminder - Your Order Arrives ${formattedDate}`,
@@ -170,7 +168,7 @@ export class NotificationService {
       }
     };
 
-    await this.sendEmailNotification(customerEmailData);
+    await this.sendEmailNotification(emailData);
 
     return { success: true };
   }

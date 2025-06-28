@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import emailService from '@/lib/emailService';
 
 export const generateQuotePDF = (quote, customer) => {
   const doc = new jsPDF();
@@ -15,7 +15,7 @@ export const generateQuotePDF = (quote, customer) => {
   // Company info (you can customize this)
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text('QuoteSales Pro', margin, 40);
+  doc.text('Promocups', margin, 40);
   doc.text('Your Sales Management Solution', margin, 50);
   
   // Quote details
@@ -156,22 +156,35 @@ export const emailQuote = async (quote, customer, pdfDoc) => {
   try {
     // Convert PDF to base64
     const pdfBase64 = pdfDoc.output('datauristring');
+    const pdfBuffer = Buffer.from(pdfBase64.split(',')[1], 'base64');
     
-    const { data, error } = await supabase.functions.invoke('send-quote-email', {
-      body: {
+    // Format the valid until date
+    const validUntil = quote.valid_until 
+      ? format(new Date(quote.valid_until), 'MMMM dd, yyyy')
+      : 'N/A';
+    
+    // Send email using our email service
+    const result = await emailService.sendQuoteEmail({
+      to: customer.email,
+      customerName: `${customer.first_name} ${customer.last_name}`,
+      subject: `Quote ${quote.quote_number || quote.id.slice(0, 8)} from Promocups`,
+      data: {
         quoteNumber: quote.quote_number || quote.id.slice(0, 8),
-        customerEmail: customer.email,
         customerName: `${customer.first_name} ${customer.last_name}`,
         companyName: customer.company_name,
-        quoteTitle: quote.title,
-        quoteTotal: quote.total,
-        pdfBase64: pdfBase64
-      }
+        validUntil: validUntil,
+        totalAmount: quote.total,
+        quoteDescription: quote.description || ''
+      },
+      attachment: pdfBuffer,
+      attachmentFilename: `quote-${quote.quote_number || quote.id.slice(0, 8)}.pdf`
     });
 
-    if (error) throw error;
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send quote email');
+    }
 
-    return data;
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending quote email:', error);
     throw error;

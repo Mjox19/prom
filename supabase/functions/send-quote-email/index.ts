@@ -1,4 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+// This file is kept for compatibility but is no longer used.
+// Email sending is now handled by the local SMTP server.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -27,8 +28,8 @@ serve(async (req) => {
       throw new Error('Missing required fields');
     }
 
-    // Log the email attempt (in production, replace this with actual email service)
-    console.log(`Sending quote email:
+    // Log the email attempt
+    console.log(`[DEPRECATED] Sending quote email via Edge Function:
       - Quote: ${quoteNumber}
       - To: ${customerEmail} (${customerName})
       - Company: ${companyName}
@@ -37,66 +38,12 @@ serve(async (req) => {
       - PDF attached: ${pdfBase64.length > 0 ? 'Yes' : 'No'}
     `);
 
-    // Here you would integrate with your email service provider
-    // Examples:
-    // - SendGrid: https://sendgrid.com/
-    // - Mailgun: https://www.mailgun.com/
-    // - Postmark: https://postmarkapp.com/
-    // - AWS SES: https://aws.amazon.com/ses/
-    
-    // Example integration with SendGrid (commented out):
-    /*
-    const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY');
-    
-    const emailData = {
-      personalizations: [{
-        to: [{ email: customerEmail, name: customerName }],
-        subject: `Quote ${quoteNumber} from QuoteSales Pro`
-      }],
-      from: { email: 'noreply@yourdomain.com', name: 'QuoteSales Pro' },
-      content: [{
-        type: 'text/html',
-        value: `
-          <h2>Quote ${quoteNumber}</h2>
-          <p>Dear ${customerName},</p>
-          <p>Please find attached your quote for ${quoteTitle || 'your request'}.</p>
-          <p><strong>Total Amount: $${quoteTotal}</strong></p>
-          <p>If you have any questions, please don't hesitate to contact us.</p>
-          <p>Best regards,<br>QuoteSales Pro Team</p>
-        `
-      }],
-      attachments: [{
-        content: pdfBase64.split(',')[1], // Remove data:application/pdf;base64, prefix
-        filename: `quote-${quoteNumber}.pdf`,
-        type: 'application/pdf',
-        disposition: 'attachment'
-      }]
-    };
-
-    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailData),
-    });
-
-    if (!response.ok) {
-      throw new Error(`SendGrid API error: ${response.status}`);
-    }
-    */
-
-    // For now, we'll simulate a successful email send
-    // In production, remove this simulation and use a real email service
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-
+    // Return success response - actual email is now sent via local SMTP server
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Quote ${quoteNumber} email sent to ${customerEmail}`,
-        // Note: This is a simulation. In production, you'd get a real response from your email service
-        emailId: `sim_${Date.now()}`
+        message: `Quote ${quoteNumber} email request received. Using local SMTP server instead.`,
+        emailId: `local_${Date.now()}`
       }),
       { 
         headers: { 
