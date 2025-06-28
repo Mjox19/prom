@@ -15,7 +15,7 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, initialized } = useAuth();
+  const { user, initialized, signIn } = useAuth();
 
   // Redirect if already authenticated and auth is initialized
   useEffect(() => {
@@ -44,6 +44,21 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     
+    if (!isSupabaseConfigured) {
+      // Demo mode - automatically log in
+      try {
+        setLoading(true);
+        await signIn({ email: 'demo@promocups.com', password: 'demo' });
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      } catch (error) {
+        console.error('Demo login error:', error);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!email || !password) {
       toast({
         title: "Validation Error",
@@ -53,19 +68,10 @@ const Login = () => {
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      toast({
-        title: "Demo Mode",
-        description: "Supabase is not configured. Please set up your environment variables.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await signIn({
         email: email.trim(),
         password: password.trim(),
       });
@@ -220,40 +226,40 @@ const Login = () => {
             <CardTitle className="text-gray-900">Welcome Back</CardTitle>
             <CardDescription>
               {!isSupabaseConfigured ? (
-                <span className="text-amber-600">Demo Mode - Supabase not configured</span>
+                <span className="text-green-600">Demo Mode - Click "Enter Demo" to continue</span>
               ) : (
                 "Sign in to your account or create a new one"
               )}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  disabled={loading}
-                  className="focus:border-orange-300 focus:ring-orange-200"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  disabled={loading}
-                  className="focus:border-orange-300 focus:ring-orange-200"
-                />
-                {isSupabaseConfigured && (
+            {isSupabaseConfigured && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    required
+                    disabled={loading}
+                    className="focus:border-orange-300 focus:ring-orange-200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                    disabled={loading}
+                    className="focus:border-orange-300 focus:ring-orange-200"
+                  />
                   <Button
                     type="button"
                     variant="link"
@@ -263,37 +269,65 @@ const Login = () => {
                   >
                     Forgot password?
                   </Button>
-                )}
+                </div>
+              </form>
+            )}
+            
+            {!isSupabaseConfigured && (
+              <div className="text-center py-4">
+                <p className="text-gray-600 mb-4">
+                  Supabase is not configured. You can explore the demo version of the application.
+                </p>
               </div>
-            </form>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
-            <Button
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-              onClick={handleLogin}
-              disabled={loading || !isSupabaseConfigured}
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Please wait...
-                </div>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
-              onClick={handleSignUp}
-              disabled={loading || !isSupabaseConfigured}
-            >
-              Create Account
-            </Button>
+            {isSupabaseConfigured ? (
+              <>
+                <Button
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                  onClick={handleLogin}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Please wait...
+                    </div>
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
+                  onClick={handleSignUp}
+                  disabled={loading}
+                >
+                  Create Account
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                onClick={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Loading Demo...
+                  </div>
+                ) : (
+                  "Enter Demo"
+                )}
+              </Button>
+            )}
+            
             {!isSupabaseConfigured && (
               <p className="text-xs text-center text-gray-500 mt-2">
-                To enable authentication, please configure your Supabase environment variables.
+                To enable full authentication, please configure your Supabase environment variables.
               </p>
             )}
           </CardFooter>

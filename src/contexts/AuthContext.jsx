@@ -3,6 +3,23 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const AuthContext = createContext({});
 
+// Demo user for when Supabase is not configured
+const DEMO_USER = {
+  id: 'demo-user-id',
+  email: 'demo@promocups.com',
+  created_at: new Date().toISOString()
+};
+
+const DEMO_PROFILE = {
+  id: 'demo-user-id',
+  email: 'demo@promocups.com',
+  first_name: 'Demo',
+  last_name: 'User',
+  full_name: 'Demo User',
+  role: 'super_admin',
+  bio: 'Demo user for testing purposes'
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -51,6 +68,10 @@ export const AuthProvider = ({ children }) => {
     
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
+    } else {
+      // Demo mode logout
+      setUser(null);
+      setUserProfile(null);
     }
     
     // Optional: Show a notification to the user
@@ -111,10 +132,11 @@ export const AuthProvider = ({ children }) => {
         console.log('Initializing auth...', { isSupabaseConfigured });
         
         if (!isSupabaseConfigured) {
-          console.log('Supabase not configured - using demo mode');
+          console.log('Supabase not configured - using demo mode with auto-login');
+          // In demo mode, automatically log in the demo user
           if (mounted) {
-            setUser(null);
-            setUserProfile(null);
+            setUser(DEMO_USER);
+            setUserProfile(DEMO_PROFILE);
             setLoading(false);
             setInitialized(true);
           }
@@ -193,15 +215,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserProfile = async (userId) => {
     if (!isSupabaseConfigured) {
-      return {
-        id: userId,
-        email: 'demo@example.com',
-        first_name: 'Demo',
-        last_name: 'User',
-        full_name: 'Demo User',
-        role: 'super_admin',
-        bio: 'Demo user for testing purposes'
-      };
+      return DEMO_PROFILE;
     }
 
     try {
@@ -225,19 +239,22 @@ export const AuthProvider = ({ children }) => {
   const value = {
     signUp: async (data) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        throw new Error('Supabase not configured - demo mode active');
       }
       const response = await supabase.auth.signUp(data);
       return response;
     },
     signIn: async (data) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        // Demo mode - simulate successful login
+        setUser(DEMO_USER);
+        setUserProfile(DEMO_PROFILE);
+        return { data: { user: DEMO_USER }, error: null };
       }
       const response = await supabase.auth.signInWithPassword(data);
       return response;
     },
-    signOut: () => {
+    signOut: async () => {
       // Clear inactivity timers
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -248,13 +265,19 @@ export const AuthProvider = ({ children }) => {
       setShowInactivityWarning(false);
       
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        // Demo mode logout
+        setUser(null);
+        setUserProfile(null);
+        return { error: null };
       }
       return supabase.auth.signOut();
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        // Demo mode - simulate profile update
+        const updatedProfile = { ...userProfile, ...updates };
+        setUserProfile(updatedProfile);
+        return { data: updatedProfile, error: null };
       }
       
       try {
@@ -275,7 +298,7 @@ export const AuthProvider = ({ children }) => {
     },
     changeUserRole: async (targetUserId, newRole) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        return { success: true }; // Demo mode
       }
       
       try {
@@ -292,7 +315,7 @@ export const AuthProvider = ({ children }) => {
     },
     promoteToSuperAdmin: async (targetUserId) => {
       if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
+        return { success: true }; // Demo mode
       }
       
       try {
