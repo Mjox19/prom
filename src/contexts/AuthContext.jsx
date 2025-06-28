@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   const timeoutRef = useRef(null);
   const warningTimeoutRef = useRef(null);
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const authStateInitialized = useRef(false);
 
   // Reset the inactivity timer
   const resetInactivityTimer = useCallback(() => {
@@ -72,6 +73,8 @@ export const AuthProvider = ({ children }) => {
   const fetchUserProfile = useCallback(async (userId) => {
     if (!userId) return null;
     
+    console.log('📋 Fetching user profile for:', userId);
+    
     if (!isSupabaseConfigured) {
       console.log('Using demo profile for user:', userId);
       const demoProfile = {
@@ -88,7 +91,6 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      console.log('Fetching profile for user:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -116,10 +118,10 @@ export const AuthProvider = ({ children }) => {
 
     const initAuth = async () => {
       try {
-        console.log('Initializing auth state...');
+        console.log('🔄 Initializing auth...', { isSupabaseConfigured });
         
         if (!isSupabaseConfigured) {
-          console.warn('Supabase not configured, using demo mode');
+          console.warn('⚠️ Supabase not configured, using demo mode');
           if (mounted) {
             setConfigError('Supabase configuration is missing or invalid');
             setLoading(false);
@@ -129,10 +131,11 @@ export const AuthProvider = ({ children }) => {
         }
 
         // Get current session
+        console.log('🔍 Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('❌ Error getting session:', error);
           if (mounted) {
             setConfigError(`Authentication error: ${error.message}`);
             setLoading(false);
@@ -144,36 +147,38 @@ export const AuthProvider = ({ children }) => {
         const session = data?.session;
         const currentUser = session?.user || null;
         
-        console.log('Session check result:', { 
-          hasSession: !!session, 
-          hasUser: !!currentUser 
-        });
-        
         if (mounted) {
-          setUser(currentUser);
-          
           if (currentUser) {
+            console.log('🔄 Auth state changed: SIGNED_IN', { hasUser: !!currentUser, userId: currentUser.id });
+            setUser(currentUser);
             await fetchUserProfile(currentUser.id);
+          } else {
+            console.log('🔄 Auth state: NO_SESSION');
+            setUser(null);
+            setUserProfile(null);
           }
           
           setLoading(false);
           setInitialized(true);
+          authStateInitialized.current = true;
         }
 
         // Set up auth state change listener
         if (mounted) {
+          console.log('🔗 Setting up auth state listener...');
           const { data: authData } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth state changed:', event, { hasUser: !!session?.user });
+            console.log('🔄 Auth state changed:', event, { hasUser: !!session?.user });
             
             if (!mounted) return;
             
             const user = session?.user || null;
-            setUser(user);
             
             if (user) {
+              setUser(user);
               await fetchUserProfile(user.id);
               resetInactivityTimer();
             } else {
+              setUser(null);
               setUserProfile(null);
               // Clear timers when user logs out
               if (timeoutRef.current) {
@@ -187,17 +192,23 @@ export const AuthProvider = ({ children }) => {
               setShowInactivityWarning(false);
             }
             
+            if (!authStateInitialized.current) {
+              setInitialized(true);
+              authStateInitialized.current = true;
+            }
+            
             setLoading(false);
           });
           
           authListener = authData.subscription;
         }
       } catch (error) {
-        console.error('Error in auth initialization:', error);
+        console.error('❌ Error in auth initialization:', error);
         if (mounted) {
           setConfigError(`Initialization error: ${error.message}`);
           setLoading(false);
           setInitialized(true);
+          authStateInitialized.current = true;
         }
       }
     };

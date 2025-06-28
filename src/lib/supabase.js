@@ -11,34 +11,36 @@ console.log('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Present' : 'Missing');
 // Check if Supabase is properly configured
 const isSupabaseConfigured = supabaseUrl && 
                             supabaseAnonKey && 
-                            supabaseUrl.startsWith('https://') &&
-                            supabaseUrl.includes('.supabase.co') &&
-                            supabaseAnonKey.length > 50; // JWT tokens are typically longer
+                            !supabaseUrl.includes('placeholder') && 
+                            !supabaseAnonKey.includes('placeholder') &&
+                            supabaseUrl.startsWith('https://');
 
 console.log('isSupabaseConfigured:', isSupabaseConfigured);
+
+// Define storage options
+const storageOptions = {
+  autoRefreshToken: true,
+  persistSession: true,
+  detectSessionInUrl: false,
+  storageKey: 'promocups-auth-storage',
+  debug: true
+};
 
 let supabase;
 
 try {
-  // Create Supabase client with proper error handling and persistent storage
-  supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co', 
-    supabaseAnonKey || 'placeholder-key',
-    {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        storageKey: 'promocups-auth-token',
-        storage: localStorage
-      }
-    }
-  );
-  
   if (isSupabaseConfigured) {
+    // Use real Supabase client
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: storageOptions
+    });
     console.log('✅ Supabase client created successfully');
   } else {
-    console.warn('⚠️ Supabase client created with placeholder values');
+    // Create a mock client for development
+    console.log('⚠️ Supabase not configured, using demo mode');
+    supabase = createClient('https://placeholder.supabase.co', 'placeholder-key', {
+      auth: storageOptions
+    });
   }
 } catch (error) {
   console.error('❌ Failed to create Supabase client:', error);
@@ -149,7 +151,7 @@ export const checkUserRole = async (userId, requiredRole) => {
 export const getUserProfile = async (userId) => {
   if (!isSupabaseConfigured) {
     return {
-      id: userId,
+      id: DEMO_USER_ID,
       email: 'demo@example.com',
       first_name: 'Demo',
       last_name: 'User',
