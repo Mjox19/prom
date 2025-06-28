@@ -33,6 +33,9 @@ const ProductFormDialog = ({ onOpenChange, product, onSubmit, resetForm }) => {
     isValid
   } = useFormValidation(initialValues, rules);
 
+  // Local state to track if form is ready for submission
+  const [isFormValid, setIsFormValid] = useState(false);
+
   useEffect(() => {
     if (product) {
       Object.keys(initialValues).forEach(key => {
@@ -42,6 +45,28 @@ const ProductFormDialog = ({ onOpenChange, product, onSubmit, resetForm }) => {
       reset();
     }
   }, [product]);
+
+  // Check form validity whenever values change
+  useEffect(() => {
+    const checkFormValidity = () => {
+      // Check required fields
+      const hasName = values.name && values.name.trim().length > 0;
+      const hasCategory = values.category && values.category.trim().length > 0;
+      
+      // Check price tiers validity
+      const hasValidTiers = values.priceTiers && values.priceTiers.length > 0 && 
+        values.priceTiers.every(tier => 
+          tier.upToQuantity > 0 && 
+          tier.upToQuantity <= 10000 && 
+          tier.price >= 0
+        );
+
+      const formIsValid = hasName && hasCategory && hasValidTiers;
+      setIsFormValid(formIsValid);
+    };
+
+    checkFormValidity();
+  }, [values]);
 
   const handleTierChange = (index, field, value) => {
     const updatedTiers = values.priceTiers.map((tier, i) => 
@@ -71,20 +96,33 @@ const ProductFormDialog = ({ onOpenChange, product, onSubmit, resetForm }) => {
       if (!tier.upToQuantity || tier.upToQuantity <= 0) {
         tierErrors.push(`Tier ${index + 1}: Quantity must be greater than 0`);
       }
-      if (!tier.price || tier.price < 0) {
-        tierErrors.push(`Tier ${index + 1}: Price must be 0 or greater`);
+      if (tier.upToQuantity > 10000) {
+        tierErrors.push(`Tier ${index + 1}: Quantity cannot exceed 10,000`);
+      }
+      if (tier.price < 0) {
+        tierErrors.push(`Tier ${index + 1}: Price cannot be negative`);
       }
     });
 
     if (tierErrors.length > 0) {
-      // You could show these errors in a toast or add them to the form validation
+      console.error('Tier validation errors:', tierErrors);
       return;
     }
 
-    if (validateAll()) {
-      onSubmit(values);
-      if (resetForm) resetForm();
+    // Validate required fields
+    if (!values.name || !values.name.trim()) {
+      setFieldTouched("name");
+      return;
     }
+
+    if (!values.category || !values.category.trim()) {
+      setFieldTouched("category");
+      return;
+    }
+
+    // If all validations pass, submit the form
+    onSubmit(values);
+    if (resetForm) resetForm();
   };
 
   return (
@@ -148,7 +186,7 @@ const ProductFormDialog = ({ onOpenChange, product, onSubmit, resetForm }) => {
             {values.priceTiers.map((tier, index) => (
               <div key={index} className="grid grid-cols-12 gap-2 items-center">
                 <div className="col-span-5">
-                  <Label className="text-xs">Up to Quantity (max 10000)</Label>
+                  <Label className="text-xs">Up to Quantity (max 10,000)</Label>
                   <Input
                     type="number"
                     value={tier.upToQuantity}
@@ -196,7 +234,8 @@ const ProductFormDialog = ({ onOpenChange, product, onSubmit, resetForm }) => {
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isValid && Object.keys(touched).length > 0}
+          disabled={!isFormValid}
+          className={isFormValid ? "" : "opacity-50 cursor-not-allowed"}
         >
           {product ? "Save Changes" : "Add Product"}
         </Button>
