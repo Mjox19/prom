@@ -3,10 +3,11 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) => {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, initialized } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Show loading only if we haven't initialized yet
+  if (!initialized || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
@@ -17,6 +18,7 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
     );
   }
 
+  // If no user and we've finished loading, redirect to login
   if (!user) {
     // Save the attempted URL for redirecting after login
     return <Navigate to="/login" state={{ from: location }} replace />;

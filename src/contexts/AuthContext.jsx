@@ -7,6 +7,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   
   // Auto-logout configuration
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -65,7 +66,7 @@ export const AuthProvider = ({ children }) => {
 
   // Set up activity listeners
   useEffect(() => {
-    if (!user) return;
+    if (!user || !initialized) return;
 
     const activityEvents = [
       'mousedown',
@@ -100,32 +101,69 @@ export const AuthProvider = ({ children }) => {
         clearTimeout(warningTimeoutRef.current);
       }
     };
-  }, [user, resetInactivityTimer]);
+  }, [user, resetInactivityTimer, initialized]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      console.error('Supabase is not configured. Please check your .env.local file.');
-      setLoading(false);
-      return;
-    }
+    let mounted = true;
 
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchUserProfile(currentUser.id);
+    const initializeAuth = async () => {
+      try {
+        if (!isSupabaseConfigured) {
+          console.log('Supabase not configured - using demo mode');
+          if (mounted) {
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        // Check active sessions and sets the user
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        const currentUser = session?.user ?? null;
+        
+        if (mounted) {
+          setUser(currentUser);
+          
+          if (currentUser) {
+            await fetchUserProfile(currentUser.id);
+          }
+          
+          setLoading(false);
+          setInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setUser(null);
+          setUserProfile(null);
+          setLoading(false);
+          setInitialized(true);
+        }
       }
-      
-      setLoading(false);
-    }).catch((error) => {
-      console.error('Error getting session:', error);
-      setLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      console.log('Auth state changed:', event, session?.user?.id);
+      
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       
@@ -143,10 +181,15 @@ export const AuthProvider = ({ children }) => {
         setShowInactivityWarning(false);
       }
       
-      setLoading(false);
+      if (!loading) {
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserProfile = async (userId) => {
@@ -255,6 +298,7 @@ export const AuthProvider = ({ children }) => {
     user,
     userProfile,
     loading,
+    initialized,
     // Inactivity-related functions and state
     showInactivityWarning,
     extendSession,

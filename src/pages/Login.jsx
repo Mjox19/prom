@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,15 +15,31 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, initialized } = useAuth();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated and auth is initialized
   useEffect(() => {
-    if (user) {
+    if (initialized && user) {
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, navigate, location]);
+  }, [user, initialized, navigate, location]);
+
+  // Don't render login form if we're still checking auth or user is already logged in
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return null; // Will redirect via useEffect
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -32,6 +48,15 @@ const Login = () => {
       toast({
         title: "Validation Error",
         description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      toast({
+        title: "Demo Mode",
+        description: "Supabase is not configured. Please set up your environment variables.",
         variant: "destructive"
       });
       return;
@@ -77,6 +102,15 @@ const Login = () => {
       toast({
         title: "Validation Error",
         description: "Password must be at least 6 characters long",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      toast({
+        title: "Demo Mode",
+        description: "Supabase is not configured. Please set up your environment variables.",
         variant: "destructive"
       });
       return;
@@ -135,6 +169,15 @@ const Login = () => {
       return;
     }
 
+    if (!isSupabaseConfigured) {
+      toast({
+        title: "Demo Mode",
+        description: "Supabase is not configured. Please set up your environment variables.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -158,11 +201,6 @@ const Login = () => {
     }
   };
 
-  // If already authenticated, don't render the login form
-  if (user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -174,13 +212,19 @@ const Login = () => {
               className="h-12 w-auto"
             />
           </div>
-          <p className="text-gray-600"></p>
+          <p className="text-gray-600">Sales Management System</p>
         </div>
         
         <Card className="border border-gray-200 shadow-lg">
           <CardHeader>
             <CardTitle className="text-gray-900">Welcome Back</CardTitle>
-            <CardDescription>Sign in to your account or create a new one</CardDescription>
+            <CardDescription>
+              {!isSupabaseConfigured ? (
+                <span className="text-amber-600">Demo Mode - Supabase not configured</span>
+              ) : (
+                "Sign in to your account or create a new one"
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -209,15 +253,17 @@ const Login = () => {
                   disabled={loading}
                   className="focus:border-orange-300 focus:ring-orange-200"
                 />
-                <Button
-                  type="button"
-                  variant="link"
-                  className="px-0 text-sm text-orange-600 hover:text-orange-700"
-                  onClick={handlePasswordReset}
-                  disabled={loading}
-                >
-                  Forgot password?
-                </Button>
+                {isSupabaseConfigured && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 text-sm text-orange-600 hover:text-orange-700"
+                    onClick={handlePasswordReset}
+                    disabled={loading}
+                  >
+                    Forgot password?
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -225,7 +271,7 @@ const Login = () => {
             <Button
               className="w-full bg-orange-500 hover:bg-orange-600 text-white"
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured}
             >
               {loading ? (
                 <div className="flex items-center">
@@ -241,10 +287,15 @@ const Login = () => {
               variant="outline"
               className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
               onClick={handleSignUp}
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured}
             >
               Create Account
             </Button>
+            {!isSupabaseConfigured && (
+              <p className="text-xs text-center text-gray-500 mt-2">
+                To enable authentication, please configure your Supabase environment variables.
+              </p>
+            )}
           </CardFooter>
         </Card>
       </div>
