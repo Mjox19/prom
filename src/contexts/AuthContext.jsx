@@ -108,6 +108,8 @@ export const AuthProvider = ({ children }) => {
 
     const initializeAuth = async () => {
       try {
+        console.log('Initializing auth...', { isSupabaseConfigured });
+        
         if (!isSupabaseConfigured) {
           console.log('Supabase not configured - using demo mode');
           if (mounted) {
@@ -119,21 +121,15 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Check active sessions and sets the user
+        // Check active sessions
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          if (mounted) {
-            setUser(null);
-            setUserProfile(null);
-            setLoading(false);
-            setInitialized(true);
-          }
-          return;
         }
 
         const currentUser = session?.user ?? null;
+        console.log('Initial session check:', { userId: currentUser?.id });
         
         if (mounted) {
           setUser(currentUser);
@@ -158,41 +154,56 @@ export const AuthProvider = ({ children }) => {
 
     initializeAuth();
 
-    // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    // Only set up auth listener if Supabase is configured
+    let subscription = null;
+    if (isSupabaseConfigured) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted) return;
 
-      console.log('Auth state changed:', event, session?.user?.id);
-      
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchUserProfile(currentUser.id);
-      } else {
-        setUserProfile(null);
-        // Clear timers when user logs out
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
+        console.log('Auth state changed:', event, session?.user?.id);
+        
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        
+        if (currentUser) {
+          await fetchUserProfile(currentUser.id);
+        } else {
+          setUserProfile(null);
+          // Clear timers when user logs out
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          if (warningTimeoutRef.current) {
+            clearTimeout(warningTimeoutRef.current);
+          }
+          setShowInactivityWarning(false);
         }
-        if (warningTimeoutRef.current) {
-          clearTimeout(warningTimeoutRef.current);
-        }
-        setShowInactivityWarning(false);
-      }
+      });
       
-      if (!loading) {
-        setLoading(false);
-      }
-    });
+      subscription = data.subscription;
+    }
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
   const fetchUserProfile = async (userId) => {
+    if (!isSupabaseConfigured) {
+      return {
+        id: userId,
+        email: 'demo@example.com',
+        first_name: 'Demo',
+        last_name: 'User',
+        full_name: 'Demo User',
+        role: 'super_admin',
+        bio: 'Demo user for testing purposes'
+      };
+    }
+
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
