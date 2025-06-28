@@ -60,7 +60,21 @@ export class NotificationService {
       return { success: true, data };
     } catch (error) {
       console.error('Error sending email notification:', error);
-      return { success: false, error: error.message };
+      
+      // Handle cases where error might be undefined or lack a message property
+      let errorMessage = 'Failed to send a request to the Edge Function. Check network or function deployment.';
+      
+      if (error && typeof error === 'object') {
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.toString && error.toString() !== '[object Object]') {
+          errorMessage = error.toString();
+        }
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      return { success: false, error: errorMessage };
     }
   }
 
