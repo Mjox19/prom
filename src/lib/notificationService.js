@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { emailUtils } from '@/lib/emailUtils';
 
 // Notification service for handling order and delivery notifications
 export class NotificationService {
@@ -44,29 +45,32 @@ export class NotificationService {
     }
   }
 
-  // Send email notification (mock implementation)
-  async sendEmailNotification(emailData) {
+  // Send email notification
+  async sendEmailNotification(options) {
     try {
-      // In a real implementation, this would connect to an email service
-      // For now, we'll just log the email data and simulate success
-      console.log('📧 Email would be sent:', {
-        to: emailData.to,
-        subject: emailData.subject,
-        template: emailData.template,
-        data: emailData.data
+      // Use emailUtils to send the email
+      const result = await emailUtils.sendEmail({
+        userId: options.userId,
+        to: options.to,
+        customerName: options.customerName,
+        subject: options.subject,
+        template: options.template,
+        data: options.data
       });
       
       // Create an in-app notification about the email
-      if (this.isConfigured && emailData.userId) {
+      if (this.isConfigured && options.userId) {
         await this.createNotification(
-          emailData.userId,
-          'Email Notification Sent',
-          `Email sent to ${emailData.to} regarding ${emailData.subject}`,
+          options.userId,
+          result.success ? 'Email Notification Sent' : 'Email Sending Failed',
+          result.success 
+            ? `Email sent to ${options.to} regarding ${options.subject}`
+            : `Failed to send email to ${options.to}: ${result.error}`,
           'system'
         );
       }
       
-      return { success: true, messageId: `mock-${Date.now()}` };
+      return result;
     } catch (error) {
       console.error('Error sending email notification:', error);
       return { success: false, error: error.message || 'Failed to send email' };
@@ -102,10 +106,10 @@ export class NotificationService {
       'sale'
     );
 
-    // Simulate sending email to customer
+    // Send email to customer
     const emailData = {
-      to: customer.email,
       userId: user.id,
+      to: customer.email,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Order Update - Status Changed to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`,
       template: 'order-status-update',
@@ -148,10 +152,10 @@ export class NotificationService {
       'sale'
     );
 
-    // Simulate sending email to customer
+    // Send email to customer
     const emailData = {
-      to: customer.email,
       userId: user.id,
+      to: customer.email,
       customerName: `${customer.first_name} ${customer.last_name}`,
       subject: `Delivery Reminder - Your Order Arrives ${formattedDate}`,
       template: 'delivery-reminder',
@@ -203,6 +207,8 @@ export class NotificationService {
         .in('status', ['pending', 'in_transit', 'out_for_delivery']);
 
       if (error) throw error;
+
+      console.log(`Found ${deliveries?.length || 0} deliveries for 5 days from now`);
 
       // Send reminders for each delivery
       for (const delivery of deliveries || []) {

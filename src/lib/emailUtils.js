@@ -160,6 +160,45 @@ const templates = {
   `
 };
 
+// Create a log entry for an email
+const logEmail = async (userId, toEmail, subject, template, status, error = null, metadata = {}) => {
+  try {
+    if (!isSupabaseConfigured) {
+      console.log('Demo mode: Would log email:', {
+        userId,
+        toEmail,
+        subject,
+        template,
+        status,
+        error,
+        metadata
+      });
+      return { success: true, demo: true };
+    }
+
+    const { data, error: insertError } = await supabase
+      .from('email_logs')
+      .insert([{
+        user_id: userId,
+        to_email: toEmail,
+        subject,
+        template,
+        status,
+        error: error,
+        metadata,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+    return { success: true, data };
+  } catch (err) {
+    console.error('Error logging email:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 // Email service functions
 export const emailUtils = {
   // Get all email templates
@@ -181,7 +220,7 @@ export const emailUtils = {
     return template(data);
   },
   
-  // Get email logs (in a real implementation, this would fetch from the database)
+  // Get email logs
   async getEmailLogs() {
     try {
       if (!isSupabaseConfigured) {
@@ -190,8 +229,10 @@ export const emailUtils = {
           id: `log-${i}`,
           to: `customer${i}@example.com`,
           subject: `Demo Email ${i}`,
+          template: i % 3 === 0 ? 'quote-email' : i % 3 === 1 ? 'order-status-update' : 'delivery-reminder',
           status: i % 3 === 0 ? 'sent' : i % 3 === 1 ? 'failed' : 'pending',
-          created_at: new Date(Date.now() - i * 3600000).toISOString()
+          created_at: new Date(Date.now() - i * 3600000).toISOString(),
+          type: i % 4 === 0 ? 'quote' : i % 4 === 1 ? 'order' : i % 4 === 2 ? 'delivery' : 'system'
         }));
       }
       
@@ -202,8 +243,26 @@ export const emailUtils = {
         .order('created_at', { ascending: false })
         .limit(100);
         
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.error('Error fetching email logs:', error);
+        throw error;
+      }
+      
+      // Transform the data to match the expected format
+      return (data || []).map(log => ({
+        id: log.id,
+        to: log.to_email,
+        subject: log.subject,
+        template: log.template,
+        status: log.status,
+        created_at: log.created_at,
+        error: log.error,
+        // Extract type from metadata or template name
+        type: log.metadata?.type || 
+              (log.template === 'quote-email' ? 'quote' : 
+               log.template === 'order-status-update' ? 'order' : 
+               log.template === 'delivery-reminder' ? 'delivery' : 'system')
+      }));
     } catch (error) {
       console.error('Error getting email logs:', error);
       return [];
@@ -349,6 +408,72 @@ export const emailUtils = {
     } catch (error) {
       console.error('Error testing SMTP connection:', error);
       return { success: false, error: error.message || 'Failed to connect to SMTP server' };
+    }
+  },
+  
+  // Send an email and log it
+  async sendEmail(options) {
+    try {
+      const { userId, to, customerName, subject, template, data } = options;
+      
+      // Validate required fields
+      if (!to || !customerName || !subject || !template || !data) {
+        throw new Error('Missing required fields for email');
+      }
+      
+      // Log the email as pending
+      await logEmail(userId, to, subject, template, 'pending', null, {
+        type: template.includes('quote') ? 'quote' : 
+              template.includes('order') ? 'order' : 
+              template.includes('delivery') ? 'delivery' : 'system',
+        customerName,
+        ...data
+      });
+      
+      // In a real implementation, this would send the email
+      // For now, we'll just log it and simulate success
+      console.log(`📧 Email would be sent:
+        To: ${to} (${customerName})
+        Subject: ${subject}
+        Template: ${template}
+        Data: ${JSON.stringify(data, null, 2)}
+      `);
+      
+      // Simulate sending delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 90% chance of success in demo mode
+      const success = Math.random() < 0.9;
+      
+      if (success) {
+        // Log the email as sent
+        await logEmail(userId, to, subject, template, 'sent', null, {
+          type: template.includes('quote') ? 'quote' : 
+                template.includes('order') ? 'order' : 
+                template.includes('delivery') ? 'delivery' : 'system',
+          customerName,
+          ...data
+        });
+        
+        return { success: true, messageId: `mock-${Date.now()}` };
+      } else {
+        // Simulate a failure
+        const error = 'SMTP connection error: Connection refused';
+        
+        // Log the email as failed
+        await logEmail(userId, to, subject, template, 'failed', error, {
+          type: template.includes('quote') ? 'quote' : 
+                template.includes('order') ? 'order' : 
+                template.includes('delivery') ? 'delivery' : 'system',
+          customerName,
+          ...data
+        });
+        
+        throw new Error(error);
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return { success: false, error: error.message || 'Failed to send email' };
     }
   }
 };

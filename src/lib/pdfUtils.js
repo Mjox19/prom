@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { emailUtils } from '@/lib/emailUtils';
 
 export const generateQuotePDF = (quote, customer) => {
   const doc = new jsPDF();
@@ -157,26 +158,40 @@ export const emailQuote = async (quote, customer, pdfDoc) => {
     // Convert PDF to base64
     const pdfBase64 = pdfDoc.output('datauristring');
     
-    // In a real implementation, this would send the email
-    // For now, we'll just log it and simulate success
-    console.log('📧 Quote email would be sent:', {
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Prepare email data
+    const emailData = {
+      userId: user?.id,
       to: customer.email,
-      subject: `Quote ${quote.quote_number || quote.id.slice(0, 8)} from Promocups`,
-      quoteNumber: quote.quote_number || quote.id.slice(0, 8),
       customerName: `${customer.first_name} ${customer.last_name}`,
-      companyName: customer.company_name,
-      quoteTitle: quote.title,
-      quoteTotal: quote.total,
-      hasPdf: !!pdfBase64
-    });
+      subject: `Quote ${quote.quote_number || quote.id.slice(0, 8)} from Promocups`,
+      template: 'quote-email',
+      data: {
+        quoteNumber: quote.quote_number || quote.id.slice(0, 8),
+        customerName: `${customer.first_name} ${customer.last_name}`,
+        companyName: customer.company_name,
+        validUntil: new Date(quote.valid_until).toLocaleDateString(),
+        totalAmount: quote.total,
+        quoteDescription: quote.description || 'Please review the attached quote document for detailed information.'
+      }
+    };
+    
+    // Send the email using emailUtils
+    const result = await emailUtils.sendEmail(emailData);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send email');
+    }
     
     // Create a notification about the email
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && user?.id) {
       try {
         const { error: notificationError } = await supabase
           .from('notifications')
           .insert([{
-            user_id: quote.user_id,
+            user_id: user.id,
             title: 'Quote Email Sent',
             message: `Quote ${quote.quote_number || quote.id.slice(0, 8)} sent to ${customer.email}`,
             type: 'quote'
@@ -190,7 +205,7 @@ export const emailQuote = async (quote, customer, pdfDoc) => {
       }
     }
 
-    return { success: true, messageId: `mock-${Date.now()}` };
+    return { success: true, messageId: result.messageId || `mock-${Date.now()}` };
   } catch (error) {
     console.error('Error sending quote email:', error);
     throw error;

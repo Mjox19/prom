@@ -57,14 +57,14 @@ const EmailViewDialog = ({ open, onOpenChange, email }) => {
         <DialogHeader>
           <DialogTitle>Email Details</DialogTitle>
           <DialogDescription>
-            Sent on {new Date(email.date || email.receivedAt).toLocaleString()}
+            Sent on {new Date(email.date || email.receivedAt || email.created_at).toLocaleString()}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-sm text-gray-500">From</Label>
-              <div className="p-2 bg-gray-50 rounded-md text-sm">{email.from}</div>
+              <div className="p-2 bg-gray-50 rounded-md text-sm">{email.from || 'sales@promocups.com'}</div>
             </div>
             <div className="space-y-1">
               <Label className="text-sm text-gray-500">To</Label>
@@ -103,19 +103,28 @@ const EmailViewDialog = ({ open, onOpenChange, email }) => {
                 </TabsList>
                 <TabsContent value="html" className="p-0">
                   <iframe
-                    srcDoc={email.html}
+                    srcDoc={email.html || `<div style="padding: 20px;"><p>No HTML content available</p></div>`}
                     className="w-full h-[400px] border-0"
                     title="Email HTML Content"
                   />
                 </TabsContent>
                 <TabsContent value="text" className="p-4">
                   <pre className="whitespace-pre-wrap text-sm font-mono bg-gray-50 p-4 rounded-md">
-                    {email.text}
+                    {email.text || 'No plain text content available'}
                   </pre>
                 </TabsContent>
               </Tabs>
             </div>
           </div>
+          
+          {email.error && (
+            <div className="space-y-1">
+              <Label className="text-sm text-gray-500">Error</Label>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                {email.error}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
@@ -472,7 +481,7 @@ const EmailAdmin = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [sortField, setSortField] = useState("date");
+  const [sortField, setSortField] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -497,14 +506,9 @@ const EmailAdmin = () => {
     try {
       setLoading(true);
 
-      // In a real implementation, we would fetch emails from the database
-      // For now, we'll generate some demo data
-      const demoEmails = generateDemoEmails(50);
-      
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setEmails(demoEmails);
+      // Fetch emails from emailUtils
+      const emailLogs = await emailUtils.getEmailLogs();
+      setEmails(emailLogs);
     } catch (error) {
       console.error('Error loading emails:', error);
       toast({
@@ -512,6 +516,9 @@ const EmailAdmin = () => {
         description: "Failed to load email data.",
         variant: "destructive"
       });
+      
+      // Fallback to empty array
+      setEmails([]);
     } finally {
       setLoading(false);
     }
@@ -629,9 +636,9 @@ const EmailAdmin = () => {
       let bValue = b[sortField];
       
       // Handle date comparison
-      if (sortField === 'date') {
-        aValue = new Date(a.date || a.receivedAt).getTime();
-        bValue = new Date(b.date || b.receivedAt).getTime();
+      if (sortField === 'created_at' || sortField === 'date') {
+        aValue = new Date(a.created_at || a.date || a.receivedAt).getTime();
+        bValue = new Date(b.created_at || b.date || b.receivedAt).getTime();
       }
       
       if (sortDirection === "asc") {
@@ -664,45 +671,6 @@ const EmailAdmin = () => {
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}
-  };
-
-  // Generate demo emails for testing
-  const generateDemoEmails = (count) => {
-    const types = ['quote', 'order', 'delivery', 'system'];
-    const statuses = ['sent', 'failed', 'pending'];
-    const subjects = [
-      'Quote #QT-2025-000123 for Acme Corp',
-      'Order Confirmation #ORD-2025-000456',
-      'Delivery Reminder for Order #ORD-2025-000789',
-      'Your Quote Has Been Accepted',
-      'Order Status Update: Processing',
-      'Important: Delivery Scheduled for Tomorrow'
-    ];
-    
-    return Array.from({ length: count }).map((_, index) => {
-      const type = types[Math.floor(Math.random() * types.length)];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const subject = subjects[Math.floor(Math.random() * subjects.length)];
-      const date = new Date();
-      date.setDate(date.getDate() - Math.floor(Math.random() * 30));
-      
-      return {
-        id: `email-${index + 1}`,
-        from: 'sales@promocups.com',
-        to: `customer${index + 1}@example.com`,
-        subject,
-        text: `This is a demo email for ${type}. Status: ${status}`,
-        html: `<div><h2>${subject}</h2><p>This is a demo email for ${type}.</p><p>Status: ${status}</p></div>`,
-        type,
-        status,
-        date: date.toISOString(),
-        attachments: type === 'quote' ? [{ 
-          filename: `quote-${index + 1}.pdf`, 
-          contentType: 'application/pdf',
-          size: Math.floor(Math.random() * 500000) + 100000
-        }] : []
-      };
-    });
   };
 
   // Check if user has permission to access this page
@@ -956,11 +924,11 @@ const EmailAdmin = () => {
                           <TableHead>Status</TableHead>
                           <TableHead 
                             className="cursor-pointer hover:bg-gray-50 select-none"
-                            onClick={() => handleSort("date")}
+                            onClick={() => handleSort("created_at")}
                           >
                             <div className="flex items-center space-x-2">
                               <span>Date</span>
-                              {getSortIcon("date")}
+                              {getSortIcon("created_at")}
                             </div>
                           </TableHead>
                           <TableHead className="text-right">Actions</TableHead>
@@ -1007,7 +975,7 @@ const EmailAdmin = () => {
                               <div className="flex items-center text-gray-500">
                                 <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                 <span className="truncate">
-                                  {new Date(email.date || email.receivedAt).toLocaleDateString()} {new Date(email.date || email.receivedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(email.created_at || email.date || email.receivedAt).toLocaleDateString()} {new Date(email.created_at || email.date || email.receivedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                             </TableCell>
