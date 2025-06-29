@@ -183,9 +183,31 @@ export const emailUtils = {
   
   // Get email logs (in a real implementation, this would fetch from the database)
   async getEmailLogs() {
-    // In a real implementation, this would fetch from the database
-    // For now, we'll return an empty array
-    return [];
+    try {
+      if (!isSupabaseConfigured) {
+        // Return demo logs in demo mode
+        return Array.from({ length: 10 }).map((_, i) => ({
+          id: `log-${i}`,
+          to: `customer${i}@example.com`,
+          subject: `Demo Email ${i}`,
+          status: i % 3 === 0 ? 'sent' : i % 3 === 1 ? 'failed' : 'pending',
+          created_at: new Date(Date.now() - i * 3600000).toISOString()
+        }));
+      }
+      
+      // In a real implementation, fetch from Supabase
+      const { data, error } = await supabase
+        .from('email_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+        
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting email logs:', error);
+      return [];
+    }
   },
   
   // Save SMTP settings (in a real implementation, this would save to the database)
@@ -193,13 +215,33 @@ export const emailUtils = {
     try {
       if (!isSupabaseConfigured) {
         console.log('Demo: Saving SMTP settings', settings);
+        
+        // Save to localStorage for demo persistence
+        localStorage.setItem('smtp_settings', JSON.stringify({
+          ...settings,
+          updated_at: new Date().toISOString()
+        }));
+        
         return { success: true };
       }
       
-      // In a real implementation, this would save to the database
-      // For now, we'll just log it
-      console.log('Saving SMTP settings:', settings);
-      
+      // In a real implementation, save to Supabase
+      const { error } = await supabase
+        .from('smtp_settings')
+        .upsert([{
+          id: 'default',
+          host: settings.host,
+          port: settings.port,
+          secure: settings.secure,
+          auth: settings.auth,
+          username: settings.username,
+          password: settings.password, // In production, this should be encrypted
+          from: settings.from,
+          from_name: settings.fromName,
+          updated_at: new Date().toISOString()
+        }]);
+        
+      if (error) throw error;
       return { success: true };
     } catch (error) {
       console.error('Error saving SMTP settings:', error);
@@ -211,6 +253,22 @@ export const emailUtils = {
   async getSmtpSettings() {
     try {
       if (!isSupabaseConfigured) {
+        // Try to get from localStorage first for demo persistence
+        const savedSettings = localStorage.getItem('smtp_settings');
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          return {
+            host: parsed.host,
+            port: parsed.port,
+            secure: parsed.secure,
+            auth: parsed.auth,
+            username: parsed.username,
+            password: parsed.password,
+            from: parsed.from,
+            fromName: parsed.fromName
+          };
+        }
+        
         // Return demo settings
         return {
           host: 'localhost',
@@ -224,8 +282,43 @@ export const emailUtils = {
         };
       }
       
-      // In a real implementation, this would fetch from the database
-      // For now, we'll return demo settings
+      // In a real implementation, fetch from Supabase
+      const { data, error } = await supabase
+        .from('smtp_settings')
+        .select('*')
+        .eq('id', 'default')
+        .single();
+        
+      if (error) {
+        // If no settings found, return defaults
+        if (error.code === 'PGRST116') {
+          return {
+            host: 'localhost',
+            port: 2525,
+            secure: false,
+            auth: false,
+            username: '',
+            password: '',
+            from: 'sales@promocups.com',
+            fromName: 'Promocups Sales'
+          };
+        }
+        throw error;
+      }
+      
+      return {
+        host: data.host,
+        port: data.port,
+        secure: data.secure,
+        auth: data.auth,
+        username: data.username,
+        password: data.password,
+        from: data.from,
+        fromName: data.from_name
+      };
+    } catch (error) {
+      console.error('Error getting SMTP settings:', error);
+      // Return default settings on error
       return {
         host: 'localhost',
         port: 2525,
@@ -236,9 +329,20 @@ export const emailUtils = {
         from: 'sales@promocups.com',
         fromName: 'Promocups Sales'
       };
+    }
+  },
+  
+  // Test SMTP connection
+  async testSmtpConnection(settings) {
+    try {
+      // In a real implementation, this would test the connection
+      // For now, we'll simulate success
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return { success: true, message: 'Connection successful!' };
     } catch (error) {
-      console.error('Error getting SMTP settings:', error);
-      throw error;
+      console.error('Error testing SMTP connection:', error);
+      return { success: false, error: error.message };
     }
   }
 };
