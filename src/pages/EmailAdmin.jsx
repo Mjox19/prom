@@ -157,6 +157,7 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
 
   const [testStatus, setTestStatus] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Check if form is valid for submission
   const isFormValid = () => {
@@ -251,6 +252,8 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
       return;
     }
     
+    setIsSaving(true);
+    
     try {
       const result = await onSave(values);
       if (result && result.success) {
@@ -258,6 +261,7 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
           title: "Settings Saved",
           description: "SMTP settings have been saved successfully."
         });
+        onOpenChange(false);
       }
     } catch (error) {
       toast({
@@ -265,6 +269,8 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
         description: error.message || "Failed to save settings.",
         variant: "destructive"
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -422,7 +428,7 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
           <Button 
             variant="outline" 
             onClick={handleTestConnection}
-            disabled={isTesting}
+            disabled={isTesting || isSaving}
             className="w-full sm:w-auto"
           >
             {isTesting ? (
@@ -439,10 +445,20 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
           </Button>
           <Button 
             onClick={handleSave}
+            disabled={isTesting || isSaving}
             className="w-full sm:w-auto"
           >
-            <Save className="h-4 w-4 mr-2" />
-            Save Settings
+            {isSaving ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Settings
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
