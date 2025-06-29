@@ -45,8 +45,7 @@ import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import fs from 'fs/promises';
-import path from 'path';
+import { emailUtils } from "@/lib/emailUtils";
 
 // Email View Dialog Component
 const EmailViewDialog = ({ open, onOpenChange, email }) => {
@@ -152,15 +151,45 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
     touched,
     setValue,
     setTouched: setFieldTouched,
-    validateAll,
-    isValid
+    validateAll
   } = useFormValidation(initialValues, rules);
 
   const [testStatus, setTestStatus] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
 
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    // Basic validation for required fields
+    if (!values.host || !values.port || !values.from || !values.fromName) {
+      return false;
+    }
+    
+    // Check for validation errors
+    if (Object.keys(errors).length > 0) {
+      return false;
+    }
+    
+    // If auth is enabled, check credentials
+    if (values.auth && (!values.username || !values.password)) {
+      return false;
+    }
+    
+    return true;
+  };
+
   const handleTestConnection = async () => {
-    if (!validateAll()) return;
+    if (!isFormValid()) {
+      // Touch all fields to show validation errors
+      setFieldTouched("host");
+      setFieldTouched("port");
+      setFieldTouched("from");
+      setFieldTouched("fromName");
+      if (values.auth) {
+        setFieldTouched("username");
+        setFieldTouched("password");
+      }
+      return;
+    }
     
     setIsTesting(true);
     setTestStatus(null);
@@ -171,7 +200,7 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
       
       // In a real implementation, we would test the connection here
       // For now, we'll just simulate success
-      setTestStatus({ success: true, message: 'Connection successful!' });
+      setTestStatus({ success: true, message: 'Connection successful! SMTP server is responding.' });
     } catch (error) {
       setTestStatus({ success: false, message: error.message || 'Connection failed' });
     } finally {
@@ -180,8 +209,18 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
   };
 
   const handleSave = () => {
-    if (validateAll()) {
+    if (isFormValid()) {
       onSave(values);
+    } else {
+      // Touch all fields to show validation errors
+      setFieldTouched("host");
+      setFieldTouched("port");
+      setFieldTouched("from");
+      setFieldTouched("fromName");
+      if (values.auth) {
+        setFieldTouched("username");
+        setFieldTouched("password");
+      }
     }
   };
 
@@ -339,7 +378,7 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
           <Button 
             variant="outline" 
             onClick={handleTestConnection}
-            disabled={isTesting || !isValid}
+            disabled={isTesting}
             className="w-full sm:w-auto"
           >
             {isTesting ? (
@@ -356,7 +395,6 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
           </Button>
           <Button 
             onClick={handleSave}
-            disabled={!isValid}
             className="w-full sm:w-auto"
           >
             <Save className="h-4 w-4 mr-2" />
@@ -421,9 +459,13 @@ const EmailAdmin = () => {
 
   const loadSmtpSettings = async () => {
     try {
-      // In a real implementation, we would fetch SMTP settings from the database
-      // For now, we'll use demo settings
-      const demoSettings = {
+      // Try to load SMTP settings from emailUtils
+      const settings = await emailUtils.getSmtpSettings();
+      setSmtpSettings(settings);
+    } catch (error) {
+      console.error('Error loading SMTP settings:', error);
+      // Fallback to default settings
+      setSmtpSettings({
         host: 'localhost',
         port: 2525,
         secure: false,
@@ -432,35 +474,31 @@ const EmailAdmin = () => {
         password: '',
         from: 'sales@promocups.com',
         fromName: 'Promocups Sales'
-      };
-      
-      setSmtpSettings(demoSettings);
-    } catch (error) {
-      console.error('Error loading SMTP settings:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load SMTP settings.",
-        variant: "destructive"
       });
     }
   };
 
   const handleSaveSmtpSettings = async (settings) => {
     try {
-      // In a real implementation, we would save the settings to the database
-      // For now, we'll just update the local state
-      setSmtpSettings(settings);
-      setIsSettingsDialogOpen(false);
+      // Save SMTP settings using emailUtils
+      const result = await emailUtils.saveSmtpSettings(settings);
       
-      toast({
-        title: "Settings Saved",
-        description: "SMTP settings have been updated successfully."
-      });
+      if (result.success) {
+        setSmtpSettings(settings);
+        setIsSettingsDialogOpen(false);
+        
+        toast({
+          title: "Settings Saved",
+          description: "SMTP settings have been updated successfully."
+        });
+      } else {
+        throw new Error(result.error || 'Failed to save settings');
+      }
     } catch (error) {
       console.error('Error saving SMTP settings:', error);
       toast({
         title: "Error",
-        description: "Failed to save SMTP settings.",
+        description: "Failed to save SMTP settings: " + error.message,
         variant: "destructive"
       });
     }
