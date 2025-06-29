@@ -210,7 +210,7 @@ export const emailUtils = {
     }
   },
   
-  // Save SMTP settings (in a real implementation, this would save to the database)
+  // Save SMTP settings
   async saveSmtpSettings(settings) {
     try {
       if (!isSupabaseConfigured) {
@@ -236,7 +236,7 @@ export const emailUtils = {
           auth: settings.auth,
           username: settings.username,
           password: settings.password, // In production, this should be encrypted
-          from: settings.from,
+          from_email: settings.from,
           from_name: settings.fromName,
           updated_at: new Date().toISOString()
         }]);
@@ -249,7 +249,7 @@ export const emailUtils = {
     }
   },
   
-  // Get SMTP settings (in a real implementation, this would fetch from the database)
+  // Get SMTP settings
   async getSmtpSettings() {
     try {
       if (!isSupabaseConfigured) {
@@ -313,7 +313,7 @@ export const emailUtils = {
         auth: data.auth,
         username: data.username,
         password: data.password,
-        from: data.from,
+        from: data.from_email,
         fromName: data.from_name
       };
     } catch (error) {

@@ -127,6 +127,7 @@ const EmailViewDialog = ({ open, onOpenChange, email }) => {
 
 // SMTP Settings Dialog Component
 const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => {
+  const { toast } = useToast();
   const initialValues = {
     host: currentSettings?.host || 'localhost',
     port: currentSettings?.port || 2525,
@@ -178,16 +179,22 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
   };
 
   const handleTestConnection = async () => {
+    // Touch all fields to show validation errors
+    setFieldTouched("host");
+    setFieldTouched("port");
+    setFieldTouched("from");
+    setFieldTouched("fromName");
+    if (values.auth) {
+      setFieldTouched("username");
+      setFieldTouched("password");
+    }
+    
     if (!isFormValid()) {
-      // Touch all fields to show validation errors
-      setFieldTouched("host");
-      setFieldTouched("port");
-      setFieldTouched("from");
-      setFieldTouched("fromName");
-      if (values.auth) {
-        setFieldTouched("username");
-        setFieldTouched("password");
-      }
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields correctly before testing the connection.",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -195,32 +202,69 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
     setTestStatus(null);
     
     try {
-      // Simulate testing the connection
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Test the connection using emailUtils
+      const result = await emailUtils.testSmtpConnection(values);
       
-      // In a real implementation, we would test the connection here
-      // For now, we'll just simulate success
-      setTestStatus({ success: true, message: 'Connection successful! SMTP server is responding.' });
+      if (result.success) {
+        setTestStatus({ success: true, message: result.message || 'Connection successful! SMTP server is responding.' });
+        toast({
+          title: "Connection Successful",
+          description: "SMTP server connection test passed."
+        });
+      } else {
+        setTestStatus({ success: false, message: result.error || 'Connection failed. Please check your settings.' });
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect to SMTP server.",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       setTestStatus({ success: false, message: error.message || 'Connection failed' });
+      toast({
+        title: "Connection Error",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive"
+      });
     } finally {
       setIsTesting(false);
     }
   };
 
-  const handleSave = () => {
-    if (isFormValid()) {
-      onSave(values);
-    } else {
-      // Touch all fields to show validation errors
-      setFieldTouched("host");
-      setFieldTouched("port");
-      setFieldTouched("from");
-      setFieldTouched("fromName");
-      if (values.auth) {
-        setFieldTouched("username");
-        setFieldTouched("password");
+  const handleSave = async () => {
+    // Touch all fields to show validation errors
+    setFieldTouched("host");
+    setFieldTouched("port");
+    setFieldTouched("from");
+    setFieldTouched("fromName");
+    if (values.auth) {
+      setFieldTouched("username");
+      setFieldTouched("password");
+    }
+    
+    if (!isFormValid()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields correctly before saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const result = await onSave(values);
+      if (result && result.success) {
+        toast({
+          title: "Settings Saved",
+          description: "SMTP settings have been saved successfully."
+        });
       }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -491,6 +535,7 @@ const EmailAdmin = () => {
           title: "Settings Saved",
           description: "SMTP settings have been updated successfully."
         });
+        return result;
       } else {
         throw new Error(result.error || 'Failed to save settings');
       }
@@ -501,6 +546,7 @@ const EmailAdmin = () => {
         description: "Failed to save SMTP settings: " + error.message,
         variant: "destructive"
       });
+      throw error;
     }
   };
 
