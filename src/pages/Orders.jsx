@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
-  Package, Truck, MapPin, Clock, AlertTriangle, Bell, ArrowUpDown
+  Package, Truck, MapPin, Clock, AlertTriangle, Bell, ArrowUpDown, Eye, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase, isSupabaseConfigured, subscribeToTable, generateQuoteNumber } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { notificationService } from "@/lib/notificationService";
+import OrderViewDialog from "@/components/orders/OrderViewDialog";
+import OrderExportButton from "@/components/orders/OrderExportButton";
 
 const OrderFormDialog = ({ open, onOpenChange, customers, products, order, onSubmit }) => {
   const initialValues = {
@@ -240,6 +242,7 @@ const Orders = () => {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [viewOrder, setViewOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -307,7 +310,7 @@ const Orders = () => {
             tracking_number: 'DEMO123456',
             created_at: new Date().toISOString(),
             items: [
-              { id: '1', product_name: 'Demo Product', product_description: 'Demo Description', quantity: 2 }
+              { id: '1', product_name: 'Demo Product', product_description: 'Demo Description', quantity: 2, unit_price: 2500, total_price: 5000 }
             ],
             delivery: [
               { id: '1', status: 'pending', carrier: 'fedex', estimated_delivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() }
@@ -321,7 +324,8 @@ const Orders = () => {
             company_name: 'Demo Company',
             first_name: 'Demo',
             last_name: 'Customer',
-            email: 'demo@example.com'
+            email: 'demo@example.com',
+            contact_language: 'english'
           }
         ]);
         
@@ -388,7 +392,9 @@ const Orders = () => {
             id: `${Date.now()}-${index}`,
             product_name: item.productName,
             product_description: item.description,
-            quantity: item.quantity
+            quantity: item.quantity,
+            unit_price: 100,
+            total_price: item.quantity * 100
           })),
           delivery: [{
             id: `del-${Date.now()}`,
@@ -415,11 +421,11 @@ const Orders = () => {
         product_name: item.productName,
         product_description: item.description,
         quantity: item.quantity,
-        unit_price: 0, // You might want to set this based on your business logic
-        total_price: 0 // This would be calculated based on unit_price * quantity
+        unit_price: 100, // You might want to set this based on your business logic
+        total_price: item.quantity * 100 // This would be calculated based on unit_price * quantity
       }));
 
-      const totalAmount = 0; // Calculate based on your business logic
+      const totalAmount = orderItems.reduce((sum, item) => sum + item.total_price, 0);
 
       // Create order
       const { data: order, error: orderError } = await supabase
@@ -481,6 +487,8 @@ const Orders = () => {
         title: "Order Created",
         description: `Order ${newQuoteNumber} has been created successfully.`
       });
+      
+      loadData(); // Reload data to get the updated orders
     } catch (error) {
       console.error('Error creating order:', error);
       toast({
@@ -537,6 +545,8 @@ const Orders = () => {
         title: "Status Updated",
         description: `Order status updated to ${newStatus}.`
       });
+      
+      loadData(); // Reload data to get the updated orders
     } catch (error) {
       console.error('Error updating order status:', error);
       toast({
@@ -551,6 +561,20 @@ const Orders = () => {
     try {
       if (!isSupabaseConfigured) {
         // Demo mode
+        setOrders(prev => prev.map(o => {
+          if (o.delivery && o.delivery.length > 0 && o.delivery[0].id === deliveryId) {
+            return {
+              ...o,
+              delivery: [{
+                ...o.delivery[0],
+                status: newStatus,
+                actual_delivery: newStatus === 'delivered' ? new Date().toISOString() : null
+              }]
+            };
+          }
+          return o;
+        }));
+        
         toast({
           title: "Delivery Updated (Demo Mode)",
           description: `Delivery status updated to ${newStatus} in demo data.`
@@ -572,6 +596,8 @@ const Orders = () => {
         title: "Delivery Updated",
         description: `Delivery status updated to ${newStatus}.`
       });
+      
+      loadData(); // Reload data to get the updated deliveries
     } catch (error) {
       console.error('Error updating delivery status:', error);
       toast({
@@ -651,6 +677,10 @@ const Orders = () => {
     return customer ? (customer.company_name || `${customer.first_name} ${customer.last_name}`) : 'Unknown';
   };
 
+  const getCustomer = (customerId) => {
+    return customers.find(c => c.id === customerId);
+  };
+
   const isDeliveryUpcoming = (delivery) => {
     if (!delivery?.estimated_delivery) return false;
     const deliveryDate = new Date(delivery.estimated_delivery);
@@ -658,6 +688,10 @@ const Orders = () => {
     fiveDaysFromNow.setDate(fiveDaysFromNow.getDate() + 5);
     const today = new Date();
     return deliveryDate >= today && deliveryDate <= fiveDaysFromNow;
+  };
+
+  const handleViewOrder = (order) => {
+    setViewOrder(order);
   };
 
   // Filter and sort orders
@@ -848,6 +882,7 @@ const Orders = () => {
                         {currentOrders.map((order) => {
                           const delivery = order.delivery?.[0];
                           const isUpcoming = delivery && isDeliveryUpcoming(delivery);
+                          const customer = order.customer || customers.find(c => c.id === order.customer_id);
                           
                           return (
                             <motion.tr
@@ -906,6 +941,22 @@ const Orders = () => {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end space-x-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewOrder(order)}
+                                    title="View Order Details"
+                                  >
+                                    <Eye className="h-4 w-4 text-blue-500" />
+                                  </Button>
+                                  
+                                  <OrderExportButton
+                                    order={order}
+                                    customer={customer}
+                                    variant="ghost"
+                                    size="icon"
+                                  />
+                                  
                                   {order.status !== 'cancelled' && order.status !== 'delivered' && (
                                     <>
                                       {order.status === 'pending' && (
@@ -1002,6 +1053,13 @@ const Orders = () => {
         customers={customers}
         order={selectedOrder}
         onSubmit={handleCreateOrder}
+      />
+
+      <OrderViewDialog
+        open={!!viewOrder}
+        onOpenChange={(open) => !open && setViewOrder(null)}
+        order={viewOrder}
+        customer={viewOrder?.customer || customers.find(c => c?.id === viewOrder?.customer_id)}
       />
     </div>
   );

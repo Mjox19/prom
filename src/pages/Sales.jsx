@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Plus, TrendingUp, Search, Filter, Calendar, Trash2, Edit, DollarSign, CheckCircle, XCircle, User,
-  ArrowUpDown
+  ArrowUpDown, Eye, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,8 @@ import Header from "@/components/layout/Header";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, isSupabaseConfigured, subscribeToTable, generateQuoteNumber } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import OrderExportButton from "@/components/orders/OrderExportButton";
+import OrderViewDialog from "@/components/orders/OrderViewDialog";
 
 const SaleFormDialog = ({ open, onOpenChange, customers, onSubmit, saleToEdit }) => {
   const initialValues = {
@@ -220,6 +222,7 @@ const Sales = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [editingSale, setEditingSale] = useState(null);
+  const [viewOrder, setViewOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -278,8 +281,13 @@ const Sales = () => {
               id: '1',
               first_name: 'John',
               last_name: 'Smith',
-              company_name: 'Acme Corporation'
-            }
+              company_name: 'Acme Corporation',
+              contact_language: 'english'
+            },
+            items: [
+              { product_name: 'Demo Product', quantity: 2, unit_price: 2500, total_price: 5000 }
+            ],
+            shipping_address: '123 Demo St, Demo City, DC 12345'
           },
           {
             id: '2',
@@ -294,8 +302,13 @@ const Sales = () => {
               id: '2',
               first_name: 'Sarah',
               last_name: 'Johnson',
-              company_name: 'TechStart Inc.'
-            }
+              company_name: 'TechStart Inc.',
+              contact_language: 'french'
+            },
+            items: [
+              { product_name: 'Demo Service', quantity: 1, unit_price: 3500, total_price: 3500 }
+            ],
+            shipping_address: '456 Demo Ave, Demo City, DC 12345'
           }
         ]);
         
@@ -304,13 +317,15 @@ const Sales = () => {
             id: '1',
             company_name: 'Acme Corporation',
             first_name: 'John',
-            last_name: 'Smith'
+            last_name: 'Smith',
+            contact_language: 'english'
           },
           {
             id: '2',
             company_name: 'TechStart Inc.',
             first_name: 'Sarah',
-            last_name: 'Johnson'
+            last_name: 'Johnson',
+            contact_language: 'french'
           }
         ]);
         
@@ -323,7 +338,9 @@ const Sales = () => {
         .from('orders')
         .select(`
           *,
-          customer:customers(id, first_name, last_name, company_name)
+          customer:customers(id, first_name, last_name, company_name, contact_language),
+          items:order_items(*),
+          delivery:deliveries(*)
         `)
         .order('created_at', { ascending: false });
 
@@ -370,7 +387,8 @@ const Sales = () => {
             id: '1',
             first_name: 'Demo',
             last_name: 'Customer',
-            company_name: 'Demo Company'
+            company_name: 'Demo Company',
+            contact_language: 'english'
           }
         }
       ]);
@@ -380,7 +398,8 @@ const Sales = () => {
           id: '1',
           company_name: 'Demo Company',
           first_name: 'Demo',
-          last_name: 'Customer'
+          last_name: 'Customer',
+          contact_language: 'english'
         }
       ]);
     } finally {
@@ -421,7 +440,8 @@ const Sales = () => {
             payment_status: saleData.payment_status,
             total_amount: saleData.amount,
             created_at: new Date().toISOString(),
-            customer: customers.find(c => c.id === saleData.customerId)
+            customer: customers.find(c => c.id === saleData.customerId),
+            shipping_address: saleData.description || "TBD"
           };
           setSales(prev => [newSale, ...prev]);
           toast({
@@ -479,6 +499,7 @@ const Sales = () => {
 
       setIsFormDialogOpen(false);
       setEditingSale(null);
+      loadPageData(); // Reload data to get the updated orders
     } catch (error) {
       console.error('Error saving order:', error);
       toast({
@@ -519,6 +540,8 @@ const Sales = () => {
         title: "Payment Status Updated",
         description: `Payment status changed to ${newStatus}.`
       });
+      
+      loadPageData(); // Reload data to get the updated orders
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast({
@@ -559,6 +582,8 @@ const Sales = () => {
           description: "Order removed from pipeline.",
           variant: "destructive"
         });
+        
+        loadPageData(); // Reload data to get the updated orders
       } catch (error) {
         console.error('Error deleting order:', error);
         toast({
@@ -573,6 +598,10 @@ const Sales = () => {
   const openEditDialog = (sale) => {
     setEditingSale(sale);
     setIsFormDialogOpen(true);
+  };
+
+  const handleViewOrder = (order) => {
+    setViewOrder(order);
   };
 
   const handleSort = (field) => {
@@ -838,7 +867,7 @@ const Sales = () => {
                             <TableCell>
                               <div className="flex items-center">
                                 <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                <span className="truncate">{sale.total_amount?.toLocaleString()}</span>
+                                <span className="truncate">${sale.total_amount?.toLocaleString()}</span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -848,6 +877,22 @@ const Sales = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewOrder(sale)}
+                                  title="View Order Details"
+                                >
+                                  <Eye className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                
+                                <OrderExportButton
+                                  order={sale}
+                                  customer={sale.customer}
+                                  variant="ghost"
+                                  size="icon"
+                                />
+                                
                                 <Select
                                   value={sale.payment_status}
                                   onValueChange={(value) => handleUpdatePaymentStatus(sale.id, value)}
@@ -900,6 +945,13 @@ const Sales = () => {
         customers={customers} 
         onSubmit={handleFormSubmit} 
         saleToEdit={editingSale}
+      />
+      
+      <OrderViewDialog
+        open={!!viewOrder}
+        onOpenChange={(open) => !open && setViewOrder(null)}
+        order={viewOrder}
+        customer={viewOrder?.customer}
       />
       
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

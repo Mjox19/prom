@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { 
   FileText, Calendar, Edit, Send, CheckCircle, XCircle, Trash2, 
-  MoreVertical, Bell, ShoppingCart, Loader2, Plus
+  MoreVertical, Bell, ShoppingCart, Loader2, Plus, Download, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import QuoteExportButton from "./QuoteExportButton";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 const QuoteTable = ({ 
   quotes, 
@@ -31,10 +33,15 @@ const QuoteTable = ({
 }) => {
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 }}};
+  const [viewQuote, setViewQuote] = React.useState(null);
 
   const getCustomerName = (customerId) => {
     const customer = customers.find(c => c.id === customerId);
     return customer ? `${customer.first_name} ${customer.last_name} - ${customer.company_name}` : "Unknown";
+  };
+
+  const getCustomer = (customerId) => {
+    return customers.find(c => c.id === customerId);
   };
 
   const handleStatusChange = (quoteId, newStatus) => {
@@ -56,6 +63,10 @@ const QuoteTable = ({
     ];
     
     return allStatuses;
+  };
+
+  const handleViewQuote = (quote) => {
+    setViewQuote(quote);
   };
 
   if (loading) {
@@ -149,9 +160,20 @@ const QuoteTable = ({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewQuote(quote)} title="View Quote">
+                          <Eye className="h-4 w-4 text-blue-500" />
+                        </Button>
+                        
                         <Button variant="ghost" size="icon" onClick={() => onEdit(quote)} title="Edit Quote">
                           <Edit className="h-4 w-4 text-amber-500" />
                         </Button>
+                        
+                        <QuoteExportButton 
+                          quote={quote} 
+                          customer={getCustomer(quote.customer_id)} 
+                          variant="ghost" 
+                          size="icon" 
+                        />
                         
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -194,6 +216,105 @@ const QuoteTable = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Quote View Dialog */}
+      <Dialog open={!!viewQuote} onOpenChange={(open) => !open && setViewQuote(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {viewQuote && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">{viewQuote.title || `Quote ${viewQuote.quote_number || viewQuote.id.slice(0, 8)}`}</h2>
+                  <p className="text-gray-500">
+                    {getCustomerName(viewQuote.customer_id)}
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <QuoteExportButton 
+                    quote={viewQuote} 
+                    customer={getCustomer(viewQuote.customer_id)} 
+                  />
+                  <Button onClick={() => onEdit(viewQuote)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Quote Number</p>
+                  <p className="font-medium">{viewQuote.quote_number || viewQuote.id.slice(0, 8)}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Status</p>
+                  <p>
+                    <span className={`status-badge status-${viewQuote.status}`}>
+                      {viewQuote.status.charAt(0).toUpperCase() + viewQuote.status.slice(1)}
+                    </span>
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Created Date</p>
+                  <p className="font-medium">{new Date(viewQuote.created_at).toLocaleDateString()}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Valid Until</p>
+                  <p className="font-medium">{viewQuote.valid_until ? new Date(viewQuote.valid_until).toLocaleDateString() : 'N/A'}</p>
+                </div>
+              </div>
+              
+              {viewQuote.description && (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-500">Description</p>
+                  <p>{viewQuote.description}</p>
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Items</h3>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Price</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewQuote.items && viewQuote.items.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.description}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${(item.quantity * item.price).toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                <div className="flex flex-col items-end space-y-1 pt-2">
+                  <div className="flex justify-between w-48">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span>${viewQuote.subtotal?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div className="flex justify-between w-48">
+                    <span className="text-gray-600">Tax:</span>
+                    <span>${viewQuote.tax?.toFixed(2) || '0.00'}</span>
+                  </div>
+                  <div className="flex justify-between w-48 font-bold border-t pt-1">
+                    <span>Total:</span>
+                    <span>${viewQuote.total?.toFixed(2) || '0.00'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

@@ -76,7 +76,11 @@ const Quotes = () => {
             tax: 400,
             total: 5400,
             created_at: new Date().toISOString(),
-            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            items: [
+              { description: 'Product A', quantity: 2, price: 1500 },
+              { description: 'Product B', quantity: 1, price: 2000 }
+            ]
           },
           {
             id: '2',
@@ -89,7 +93,10 @@ const Quotes = () => {
             tax: 240,
             total: 3240,
             created_at: new Date(Date.now() - 86400000).toISOString(),
-            valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+            valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+            items: [
+              { description: 'Service X', quantity: 1, price: 3000 }
+            ]
           }
         ]);
         
@@ -99,14 +106,16 @@ const Quotes = () => {
             company_name: 'Demo Company 1',
             first_name: 'John',
             last_name: 'Doe',
-            email: 'john@demo1.com'
+            email: 'john@demo1.com',
+            contact_language: 'english'
           },
           {
             id: '2',
             company_name: 'Demo Company 2',
             first_name: 'Jane',
             last_name: 'Smith',
-            email: 'jane@demo2.com'
+            email: 'jane@demo2.com',
+            contact_language: 'french'
           }
         ]);
         
@@ -119,7 +128,8 @@ const Quotes = () => {
         .from('quotes')
         .select(`
           *,
-          customer:customers(*)
+          customer:customers(*),
+          items:quote_items(*)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -154,7 +164,10 @@ const Quotes = () => {
           title: 'Demo Quote',
           status: 'draft',
           total: 1000,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          items: [
+            { description: 'Demo Product', quantity: 1, price: 1000 }
+          ]
         }
       ]);
       setCustomers([
@@ -162,7 +175,8 @@ const Quotes = () => {
           id: '1',
           company_name: 'Demo Company',
           first_name: 'Demo',
-          last_name: 'Customer'
+          last_name: 'Customer',
+          contact_language: 'english'
         }
       ]);
     } finally {
@@ -180,7 +194,16 @@ const Quotes = () => {
         if (editingQuote) {
           setQuotes(prev => prev.map(quote => 
             quote.id === editingQuote.id 
-              ? { ...quote, ...quoteData, updated_at: new Date().toISOString() }
+              ? { 
+                  ...quote, 
+                  ...quoteData, 
+                  updated_at: new Date().toISOString(),
+                  items: quoteData.items.map(item => ({
+                    description: item.description,
+                    quantity: item.quantity,
+                    price: item.price
+                  }))
+                }
               : quote
           ));
           toast({
@@ -201,7 +224,12 @@ const Quotes = () => {
             total: quoteData.total,
             status: 'draft',
             created_at: new Date().toISOString(),
-            valid_until: validUntil.toISOString()
+            valid_until: validUntil.toISOString(),
+            items: quoteData.items.map(item => ({
+              description: item.description,
+              quantity: item.quantity,
+              price: item.price
+            }))
           };
           setQuotes(prev => [newQuote, ...prev]);
           toast({
@@ -216,7 +244,8 @@ const Quotes = () => {
       }
 
       if (editingQuote) {
-        const { error } = await supabase
+        // First update the quote
+        const { error: quoteError } = await supabase
           .from('quotes')
           .update({
             customer_id: quoteData.customerId,
@@ -231,7 +260,29 @@ const Quotes = () => {
           .eq('id', editingQuote.id)
           .eq('user_id', user.id);
 
-        if (error) throw error;
+        if (quoteError) throw quoteError;
+        
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('quote_items')
+          .delete()
+          .eq('quote_id', editingQuote.id);
+          
+        if (deleteError) throw deleteError;
+        
+        // Insert new items
+        const { error: itemsError } = await supabase
+          .from('quote_items')
+          .insert(
+            quoteData.items.map(item => ({
+              quote_id: editingQuote.id,
+              description: item.description,
+              quantity: item.quantity,
+              price: item.price
+            }))
+          );
+          
+        if (itemsError) throw itemsError;
 
         toast({
           title: "Quote Updated",
@@ -240,7 +291,8 @@ const Quotes = () => {
       } else {
         const newQuoteNumber = generateQuoteNumber();
         
-        const { error } = await supabase
+        // Create new quote
+        const { data: newQuote, error: quoteError } = await supabase
           .from('quotes')
           .insert([{
             quote_number: newQuoteNumber,
@@ -253,9 +305,25 @@ const Quotes = () => {
             total: quoteData.total,
             valid_until: validUntil.toISOString(),
             status: 'draft'
-          }]);
+          }])
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (quoteError) throw quoteError;
+        
+        // Insert items
+        const { error: itemsError } = await supabase
+          .from('quote_items')
+          .insert(
+            quoteData.items.map(item => ({
+              quote_id: newQuote.id,
+              description: item.description,
+              quantity: item.quantity,
+              price: item.price
+            }))
+          );
+          
+        if (itemsError) throw itemsError;
 
         toast({
           title: "Quote Created",
@@ -265,6 +333,7 @@ const Quotes = () => {
 
       setIsFormDialogOpen(false);
       setEditingQuote(null);
+      loadPageData(); // Reload data to get the updated quotes with items
     } catch (error) {
       console.error('Error saving quote:', error);
       toast({
@@ -347,6 +416,8 @@ const Quotes = () => {
           description: "The quote has been successfully deleted.",
           variant: "destructive"
         });
+        
+        loadPageData(); // Reload data to get the updated quotes list
       } catch (error) {
         console.error('Error deleting quote:', error);
         toast({
@@ -411,12 +482,32 @@ const Quotes = () => {
 
       if (deliveryError) throw deliveryError;
 
+      // Create order items from quote items
+      if (quote.items && quote.items.length > 0) {
+        const orderItems = quote.items.map(item => ({
+          order_id: order.id,
+          product_name: item.description,
+          product_description: '',
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.quantity * item.price
+        }));
+        
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+          
+        if (itemsError) throw itemsError;
+      }
+
       await handleUpdateStatus(quoteId, 'ordered');
 
       toast({
         title: "Quote Converted",
         description: `Quote ${quote.quote_number} successfully converted to order and will appear in Sales page.`
       });
+      
+      loadPageData(); // Reload data to get the updated quotes
     } catch (error) {
       console.error('Error converting quote to sale:', error);
       toast({
