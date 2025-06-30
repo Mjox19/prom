@@ -12,6 +12,7 @@ import EmailAdmin from '@/pages/EmailAdmin';
 import Settings from '@/pages/Settings';
 import Admin from '@/pages/Admin';
 import Login from '@/pages/Login';
+import TemplateSettings from '@/pages/TemplateSettings';
 import AuthGuard from '@/components/AuthGuard';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -52,6 +53,7 @@ function App() {
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
             <Route path="email-templates" element={<EmailTemplates />} />
+            <Route path="template-settings" element={<TemplateSettings />} />
             <Route path="email-admin" element={
               <AuthGuard requiredRole="super_admin" fallbackPath="/">
                 <EmailAdmin />
