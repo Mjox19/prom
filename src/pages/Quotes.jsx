@@ -637,16 +637,14 @@ const Quotes = () => {
                   <Plus className="h-4 w-4 mr-2" />Create Quote
                 </Button>
               </DialogTrigger>
-              {isFormDialogOpen && (
-                <DialogContent className="sm:max-w-[800px]">
-                  <QuoteFormDialog 
-                    onOpenChange={setIsFormDialogOpen} 
-                    customers={customers} 
-                    onSubmit={handleFormSubmit} 
-                    quoteToEdit={editingQuote} 
-                  />
-                </DialogContent>
-              )}
+              <DialogContent className="sm:max-w-[800px]">
+                <QuoteFormDialog 
+                  onOpenChange={setIsFormDialogOpen} 
+                  customers={customers} 
+                  onSubmit={handleFormSubmit} 
+                  quoteToEdit={editingQuote} 
+                />
+              </DialogContent>
             </Dialog>
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
               <div className="relative">

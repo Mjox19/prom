@@ -125,16 +125,14 @@ const Products = () => {
                   <Plus className="h-4 w-4 mr-2" /> Add Product
                 </Button>
               </DialogTrigger>
-              {isFormDialogOpen && (
-                <DialogContent className="sm:max-w-[600px]">
-                  <ProductFormDialog 
-                    onOpenChange={setIsFormDialogOpen}
-                    product={selectedProduct}
-                    onSubmit={handleFormSubmit}
-                    resetForm={resetCurrentProductState}
-                  />
-                </DialogContent>
-              )}
+              <DialogContent className="sm:max-w-[600px]">
+                <ProductFormDialog 
+                  onOpenChange={setIsFormDialogOpen}
+                  product={selectedProduct}
+                  onSubmit={handleFormSubmit}
+                  resetForm={resetCurrentProductState}
+                />
+              </DialogContent>
             </Dialog>
             
             <div className="relative w-full sm:w-auto">
