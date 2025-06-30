@@ -491,7 +491,7 @@ const EmailTemplates = () => {
           carrier: "FedEx",
           shipping_address: "123 Business Ave, Suite 100, New York, NY 10001",
           tracking_number: "1Z999AA1234567890",
-          order_amount: "1,250.00"
+          'order_amount': "1,250.00"
         };
       default:
         return baseData;
