@@ -621,7 +621,7 @@ export const generateOrderPDF = (order, customer) => {
     currentY += 15;
     doc.setFontSize(baseFontSize + 2);
     doc.setTextColor(template.colors.primary || '#EF4B24');
-    doc.text(template.content.deliveryTitle || t.carrier, margin, currentY);
+    doc.text(template.content.deliveryTitle || t.deliveryTitle, margin, currentY);
     doc.setFontSize(baseFontSize);
     doc.setTextColor(template.colors.text || '#333333');
     currentY += 10;
@@ -631,7 +631,7 @@ export const generateOrderPDF = (order, customer) => {
       currentY += 15;
       doc.setFontSize(baseFontSize + 2);
       doc.setTextColor(template.colors.primary || '#EF4B24');
-      doc.text(template.content.estimatedDelivery || t.estimatedDelivery, margin, currentY);
+      doc.text(t.estimatedDelivery, margin, currentY);
       doc.setFontSize(baseFontSize);
       doc.setTextColor(template.colors.text || '#333333');
       currentY += 10;
@@ -639,30 +639,43 @@ export const generateOrderPDF = (order, customer) => {
     }
   }
 
-  // Order Items
-  currentY += 25;
-  if (currentY > 250) {
-    doc.addPage();
-    currentY = 20;
-  }
+  // Add a new page for items
+  doc.addPage();
+  currentY = 20;
   
+  // Order Items
   doc.setFontSize(baseFontSize + 2);
   doc.setTextColor(template.colors.primary || '#EF4B24');
   doc.text(template.content.itemsTitle || t.items, margin, currentY);
   currentY += 15;
 
   // Table headers
-  doc.setFontSize(baseFontSize - 2);
+  doc.setFontSize(baseFontSize);
   doc.setTextColor(template.colors.text || '#333333');
   
   // Use template columns or defaults
   const columns = template.content.itemsColumns || [t.description, t.qty, t.price, t.total];
-  const colWidths = [100, 20, 30, 30]; // Adjust based on your needs
-  let xPos = margin;
   
+  // Define column widths and positions
+  const colWidths = [
+    pageWidth * 0.45 - margin, // Description (45% of page width)
+    pageWidth * 0.15,          // Qty (15% of page width)
+    pageWidth * 0.15,          // Price (15% of page width)
+    pageWidth * 0.15           // Total (15% of page width)
+  ];
+  
+  const colPositions = [
+    margin,                                // Description starts at left margin
+    margin + colWidths[0],                 // Qty
+    margin + colWidths[0] + colWidths[1],  // Price
+    margin + colWidths[0] + colWidths[1] + colWidths[2]  // Total
+  ];
+  
+  // Draw table headers
   columns.forEach((col, index) => {
-    doc.text(col, xPos, currentY);
-    xPos += colWidths[index];
+    const alignment = index === 0 ? 'left' : 'right';
+    const xPos = index === 0 ? colPositions[index] : colPositions[index] + colWidths[index] - 5;
+    doc.text(col, xPos, currentY, { align: alignment });
   });
   
   currentY += 10;
@@ -684,17 +697,17 @@ export const generateOrderPDF = (order, customer) => {
       const unitPrice = item.unit_price || 0;
       const totalPrice = item.total_price || (quantity * unitPrice);
       
-      xPos = margin;
-      doc.text(description.substring(0, 40), xPos, currentY);
-      xPos += colWidths[0];
+      // Description (left-aligned)
+      doc.text(description.substring(0, 40), colPositions[0], currentY);
       
-      doc.text(quantity.toString(), xPos, currentY);
-      xPos += colWidths[1];
+      // Quantity (right-aligned)
+      doc.text(quantity.toString(), colPositions[1] + colWidths[1] - 5, currentY, { align: 'right' });
       
-      doc.text(formatCurrency(unitPrice, language), xPos, currentY);
-      xPos += colWidths[2];
+      // Unit Price (right-aligned)
+      doc.text(formatCurrency(unitPrice, language), colPositions[2] + colWidths[2] - 5, currentY, { align: 'right' });
       
-      doc.text(formatCurrency(totalPrice, language), xPos, currentY);
+      // Total Price (right-aligned)
+      doc.text(formatCurrency(totalPrice, language), colPositions[3] + colWidths[3] - 5, currentY, { align: 'right' });
       
       currentY += 10;
     });
@@ -703,12 +716,16 @@ export const generateOrderPDF = (order, customer) => {
     currentY += 10;
   }
 
+  // Draw line above total
+  currentY += 5;
+  doc.line(colPositions[2], currentY - 2, pageWidth - margin, currentY - 2);
+  currentY += 5;
+
   // Total
-  currentY += 15;
   doc.setFontSize(baseFontSize + 2);
   doc.setTextColor(template.colors.primary || '#EF4B24');
-  doc.text(template.content.totalLabel || t.total, 150, currentY);
-  doc.text(formatCurrency(order.total_amount || 0, language), 180, currentY);
+  doc.text(template.content.totalLabel || t.total, colPositions[2], currentY);
+  doc.text(formatCurrency(order.total_amount || 0, language), pageWidth - margin - 5, currentY, { align: 'right' });
 
   // Footer
   currentY += 20;
