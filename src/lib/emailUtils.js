@@ -56,6 +56,61 @@ const templates = {
     </html>
   `,
   
+  'delivery-notification': (data) => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Delivery Notification</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f5f3ff; padding: 30px; border-radius: 0 0 8px 8px; }
+        .delivery-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6; }
+        .tracking-box { background: #ede9fe; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+        .button { display: inline-block; padding: 12px 24px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 6px; margin: 10px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🚚 Your Order is On the Way!</h1>
+          <p>Delivery notification for your recent order</p>
+        </div>
+        <div class="content">
+          <p>Dear ${data.customerName},</p>
+          <p>Great news! Your order has been shipped and is on its way to you.</p>
+          
+          <div class="delivery-info">
+            <h3>Delivery Information</h3>
+            <p><strong>Order Number:</strong> ${data.orderNumber}</p>
+            <p><strong>Carrier:</strong> ${data.carrier}</p>
+            <p><strong>Estimated Delivery Date:</strong> ${data.estimatedDelivery}</p>
+            <p><strong>Shipping Address:</strong><br>${data.shippingAddress}</p>
+          </div>
+          
+          ${data.trackingNumber ? `
+          <div class="tracking-box">
+            <p><strong>Tracking Number:</strong> ${data.trackingNumber}</p>
+            <a href="#" class="button">Track Your Package</a>
+          </div>
+          ` : ''}
+          
+          <p>If you have any questions about your delivery, please don't hesitate to contact our customer service team.</p>
+          
+          <p>Thank you for your order!</p>
+        </div>
+        <div class="footer">
+          <p>Promocups - Your Sales Management Solution</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `,
+  
   'delivery-reminder': (data) => `
     <!DOCTYPE html>
     <html>
@@ -229,10 +284,16 @@ export const emailUtils = {
           id: `log-${i}`,
           to: `customer${i}@example.com`,
           subject: `Demo Email ${i}`,
-          template: i % 3 === 0 ? 'quote-email' : i % 3 === 1 ? 'order-status-update' : 'delivery-reminder',
+          template: i % 5 === 0 ? 'quote-email' : 
+                   i % 5 === 1 ? 'order-status-update' : 
+                   i % 5 === 2 ? 'delivery-reminder' : 
+                   i % 5 === 3 ? 'delivery-notification' : 'system',
           status: i % 3 === 0 ? 'sent' : i % 3 === 1 ? 'failed' : 'pending',
           created_at: new Date(Date.now() - i * 3600000).toISOString(),
-          type: i % 4 === 0 ? 'quote' : i % 4 === 1 ? 'order' : i % 4 === 2 ? 'delivery' : 'system'
+          type: i % 5 === 0 ? 'quote' : 
+                i % 5 === 1 ? 'order' : 
+                i % 5 === 2 ? 'delivery' : 
+                i % 5 === 3 ? 'delivery' : 'system'
         }));
       }
       
@@ -261,7 +322,7 @@ export const emailUtils = {
         type: log.metadata?.type || 
               (log.template === 'quote-email' ? 'quote' : 
                log.template === 'order-status-update' ? 'order' : 
-               log.template === 'delivery-reminder' ? 'delivery' : 'system')
+               log.template === 'delivery-reminder' || log.template === 'delivery-notification' ? 'delivery' : 'system')
       }));
     } catch (error) {
       console.error('Error getting email logs:', error);

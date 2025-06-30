@@ -128,7 +128,84 @@ export class NotificationService {
 
     await this.sendEmailNotification(emailData);
 
+    // If status changed to shipped, send delivery notification
+    if (newStatus === 'shipped') {
+      await this.sendDeliveryNotification(order, customer, user);
+    }
+
     return { success: true };
+  }
+
+  // Send delivery notification when order is shipped
+  async sendDeliveryNotification(order, customer, user) {
+    try {
+      // Get delivery information
+      let delivery = null;
+      
+      if (this.isConfigured) {
+        const { data, error } = await supabase
+          .from('deliveries')
+          .select('*')
+          .eq('order_id', order.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching delivery:', error);
+        } else {
+          delivery = data;
+        }
+      }
+      
+      // If no delivery found, use default values
+      const estimatedDelivery = delivery?.estimated_delivery 
+        ? new Date(delivery.estimated_delivery).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+      
+      const carrier = delivery?.carrier?.toUpperCase() || 'FEDEX';
+      
+      // Create notification for the user
+      await this.createNotification(
+        user.id,
+        'Order Shipped',
+        `Order #${order.id.slice(0, 8)} has been shipped via ${carrier}`,
+        'sale'
+      );
+
+      // Send email to customer
+      const emailData = {
+        userId: user.id,
+        to: customer.email,
+        customerName: `${customer.first_name} ${customer.last_name}`,
+        subject: `Your Order is On the Way - Order #${order.id.slice(0, 8)}`,
+        template: 'delivery-notification',
+        data: {
+          orderNumber: order.id.slice(0, 8),
+          customerName: `${customer.first_name} ${customer.last_name}`,
+          companyName: customer.company_name,
+          carrier: carrier,
+          estimatedDelivery: estimatedDelivery,
+          shippingAddress: order.shipping_address,
+          trackingNumber: order.tracking_number
+        }
+      };
+
+      await this.sendEmailNotification(emailData);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending delivery notification:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Handle delivery reminder notifications (5 days ahead)

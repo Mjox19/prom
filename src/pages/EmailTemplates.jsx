@@ -15,7 +15,9 @@ import {
   Monitor,
   Smartphone,
   Download,
-  Upload
+  Upload,
+  Truck,
+  Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,6 +208,119 @@ const defaultTemplates = {
   </div>
 </body>
 </html>`
+  },
+  deliveryNotification: {
+    name: "Delivery Notification Template",
+    subject: "Your Order is On the Way - {{order_number}}",
+    html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Notification</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f5f3ff; padding: 30px; border-radius: 0 0 8px 8px; }
+    .delivery-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6; }
+    .tracking-box { background: #ede9fe; padding: 15px; border-radius: 8px; margin: 15px 0; text-align: center; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+    .button { display: inline-block; padding: 12px 24px; background: #8b5cf6; color: white; text-decoration: none; border-radius: 6px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚚 Your Order is On the Way!</h1>
+      <p>Delivery notification for your recent order</p>
+    </div>
+    <div class="content">
+      <p>Dear {{customer_name}},</p>
+      <p>Great news! Your order has been shipped and is on its way to you.</p>
+      
+      <div class="delivery-info">
+        <h3>Delivery Information</h3>
+        <p><strong>Order Number:</strong> {{order_number}}</p>
+        <p><strong>Carrier:</strong> {{carrier}}</p>
+        <p><strong>Estimated Delivery Date:</strong> {{estimated_delivery}}</p>
+        <p><strong>Shipping Address:</strong><br>{{shipping_address}}</p>
+      </div>
+      
+      {{#if tracking_number}}
+      <div class="tracking-box">
+        <p><strong>Tracking Number:</strong> {{tracking_number}}</p>
+        <a href="#" class="button">Track Your Package</a>
+      </div>
+      {{/if}}
+      
+      <p>If you have any questions about your delivery, please don't hesitate to contact our customer service team.</p>
+      
+      <p>Thank you for your order!</p>
+    </div>
+    <div class="footer">
+      <p>{{company_name}} - Your Sales Management Solution</p>
+    </div>
+  </div>
+</body>
+</html>`
+  },
+  deliveryReminder: {
+    name: "Delivery Reminder Template",
+    subject: "Delivery Reminder - Your Order Arrives Soon",
+    html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Reminder</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #EF4B24, #d63e1f); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #fff7ed; padding: 30px; border-radius: 0 0 8px 8px; }
+    .delivery-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #EF4B24; }
+    .highlight { background: #ffedd5; padding: 15px; border-radius: 8px; margin: 15px 0; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚚 Delivery Reminder</h1>
+      <p>Your order is arriving soon!</p>
+    </div>
+    <div class="content">
+      <p>Dear {{customer_name}},</p>
+      
+      <div class="highlight">
+        <h3>📦 Your order is scheduled for delivery on {{delivery_date}}</h3>
+      </div>
+      
+      <div class="delivery-info">
+        <h3>Delivery Details</h3>
+        <p><strong>Order #:</strong> {{order_number}}</p>
+        <p><strong>Company:</strong> {{company_name}}</p>
+        <p><strong>Carrier:</strong> {{carrier}}</p>
+        {{#if tracking_number}}
+        <p><strong>Tracking Number:</strong> {{tracking_number}}</p>
+        {{/if}}
+        <p><strong>Delivery Address:</strong><br>{{shipping_address}}</p>
+        <p><strong>Order Value:</strong> ${{order_amount}}</p>
+      </div>
+      
+      <p><strong>Please ensure someone is available to receive your delivery.</strong></p>
+      
+      <p>If you need to reschedule or have any questions about your delivery, please contact us as soon as possible.</p>
+      
+      <p>Thank you for choosing us!</p>
+    </div>
+    <div class="footer">
+      <p>{{company_name}} - Your Sales Management Solution</p>
+    </div>
+  </div>
+</body>
+</html>`
   }
 };
 
@@ -316,6 +431,10 @@ const EmailTemplates = () => {
         return <CheckCircle className="h-6 w-6 text-green-500" />;
       case 'orderStatusUpdate':
         return <ShoppingCart className="h-6 w-6 text-orange-500" />;
+      case 'deliveryNotification':
+        return <Truck className="h-6 w-6 text-purple-500" />;
+      case 'deliveryReminder':
+        return <Bell className="h-6 w-6 text-orange-500" />;
       default:
         return <Mail className="h-6 w-6 text-gray-500" />;
     }
@@ -354,6 +473,25 @@ const EmailTemplates = () => {
           status_color: "#8b5cf6",
           status_message: "Your order has been shipped and is on its way to you.",
           tracking_number: "1Z999AA1234567890"
+        };
+      case 'deliveryNotification':
+        return {
+          ...baseData,
+          order_number: "ORD-2025-000456",
+          carrier: "FedEx",
+          estimated_delivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          shipping_address: "123 Business Ave, Suite 100, New York, NY 10001",
+          tracking_number: "1Z999AA1234567890"
+        };
+      case 'deliveryReminder':
+        return {
+          ...baseData,
+          order_number: "ORD-2025-000456",
+          delivery_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          carrier: "FedEx",
+          shipping_address: "123 Business Ave, Suite 100, New York, NY 10001",
+          tracking_number: "1Z999AA1234567890",
+          order_amount: "1,250.00"
         };
       default:
         return baseData;
@@ -553,6 +691,7 @@ const TemplateEditor = ({ template, onSave, onCancel, loading }) => {
     html: template.html
   });
   const [activeTab, setActiveTab] = useState('html');
+  const { toast } = useToast();
 
   const handleSave = () => {
     onSave({
@@ -567,7 +706,8 @@ const TemplateEditor = ({ template, onSave, onCancel, loading }) => {
     '{{company_name}}', '{{customer_name}}', '{{quote_number}}', '{{order_number}}',
     '{{total_amount}}', '{{order_date}}', '{{valid_until}}', '{{order_status}}',
     '{{tracking_number}}', '{{shipping_address}}', '{{estimated_delivery}}',
-    '{{old_status}}', '{{new_status}}', '{{status_color}}', '{{status_message}}'
+    '{{old_status}}', '{{new_status}}', '{{status_color}}', '{{status_message}}',
+    '{{carrier}}', '{{delivery_date}}', '{{order_amount}}'
   ];
 
   return (
@@ -665,4 +805,4 @@ const TemplateEditor = ({ template, onSave, onCancel, loading }) => {
   );
 };
 
-export default EmailTemplates
+export default EmailTemplates;
