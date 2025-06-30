@@ -34,7 +34,8 @@ const translations = {
     paymentStatus: 'Payment Status:',
     trackingNumber: 'Tracking Number:',
     estimatedDelivery: 'Estimated Delivery:',
-    carrier: 'Carrier:'
+    carrier: 'Carrier:',
+    deliveryTitle: 'Delivery Information:'
   },
   french: {
     quote: 'DEVIS',
@@ -65,7 +66,8 @@ const translations = {
     paymentStatus: 'Statut du paiement:',
     trackingNumber: 'Numéro de suivi:',
     estimatedDelivery: 'Livraison estimée:',
-    carrier: 'Transporteur:'
+    carrier: 'Transporteur:',
+    deliveryTitle: 'Informations de livraison:'
   },
   spanish: {
     quote: 'PRESUPUESTO',
@@ -96,7 +98,8 @@ const translations = {
     paymentStatus: 'Estado del pago:',
     trackingNumber: 'Número de seguimiento:',
     estimatedDelivery: 'Entrega estimada:',
-    carrier: 'Transportista:'
+    carrier: 'Transportista:',
+    deliveryTitle: 'Información de entrega:'
   },
   dutch: {
     quote: 'OFFERTE',
@@ -127,7 +130,8 @@ const translations = {
     paymentStatus: 'Betalingsstatus:',
     trackingNumber: 'Trackingnummer:',
     estimatedDelivery: 'Geschatte levering:',
-    carrier: 'Vervoerder:'
+    carrier: 'Vervoerder:',
+    deliveryTitle: 'Leveringsinformatie:'
   }
 };
 
