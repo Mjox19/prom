@@ -25,9 +25,13 @@ const NotificationDropdown = () => {
         console.log('Notification change detected:', payload);
         
         if (payload.eventType === 'INSERT') {
+          // Add the new notification to the state
           setNotifications(prev => [payload.new, ...prev]);
+          
+          // Update unread count if the notification is unread
           if (!payload.new.read) {
             setUnreadCount(prev => prev + 1);
+            
             // Show browser notification if enabled
             if (Notification.permission === 'granted') {
               new Notification(payload.new.title, {
@@ -37,15 +41,20 @@ const NotificationDropdown = () => {
             }
           }
         } else if (payload.eventType === 'UPDATE') {
+          // Update the notification in the state
           setNotifications(prev =>
             prev.map(n => n.id === payload.new.id ? payload.new : n)
           );
+          
           // Update unread count if read status changed
           if (payload.old.read !== payload.new.read) {
             setUnreadCount(prev => payload.new.read ? prev - 1 : prev + 1);
           }
         } else if (payload.eventType === 'DELETE') {
+          // Remove the notification from the state
           setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+          
+          // Update unread count if the deleted notification was unread
           if (!payload.old.read) {
             setUnreadCount(prev => Math.max(0, prev - 1));
           }
