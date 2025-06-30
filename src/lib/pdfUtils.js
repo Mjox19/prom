@@ -223,6 +223,93 @@ const translateStatus = (status, language = 'english') => {
   return statusTranslations[language]?.[status] || status;
 };
 
+// Get PDF templates from localStorage
+const getPdfTemplates = () => {
+  try {
+    const savedTemplates = localStorage.getItem('pdf_templates');
+    if (savedTemplates) {
+      return JSON.parse(savedTemplates);
+    }
+  } catch (error) {
+    console.error('Error loading PDF templates:', error);
+  }
+  
+  // Default templates if none found
+  return {
+    quote: {
+      name: "Quote PDF Template",
+      language: "english",
+      header: {
+        title: "QUOTE",
+        companyInfo: "Promocups\nYour Sales Management Solution",
+        showLogo: true
+      },
+      content: {
+        customerTitle: "Bill To:",
+        quoteTitle: "Quote Title:",
+        descriptionTitle: "Description:",
+        itemsTitle: "Items",
+        itemsColumns: ["Description", "Qty", "Price", "Total"],
+        subtotalLabel: "Subtotal:",
+        taxLabel: "Tax:",
+        totalLabel: "Total:",
+        termsTitle: "Terms and Conditions:",
+        terms: [
+          "1. This quote is valid for the period specified above.",
+          "2. Payment terms: 50% upfront, 50% upon delivery.",
+          "3. Prices are subject to change without notice.",
+          "4. All work will be completed according to specifications."
+        ],
+        footerText: "Thank you for your business!"
+      },
+      colors: {
+        primary: "#4f46e5",
+        secondary: "#f9fafb",
+        text: "#333333",
+        headerText: "#ffffff"
+      },
+      fonts: {
+        main: "Arial",
+        size: "normal"
+      }
+    },
+    order: {
+      name: "Order PDF Template",
+      language: "english",
+      header: {
+        title: "ORDER",
+        companyInfo: "Promocups\nYour Sales Management Solution",
+        showLogo: true
+      },
+      content: {
+        customerTitle: "Bill To:",
+        shippingTitle: "Shipping Address:",
+        orderTitle: "Order Information:",
+        statusTitle: "Order Status:",
+        paymentTitle: "Payment Status:",
+        trackingTitle: "Tracking Information:",
+        deliveryTitle: "Delivery Information:",
+        itemsTitle: "Items",
+        itemsColumns: ["Description", "Qty", "Price", "Total"],
+        subtotalLabel: "Subtotal:",
+        taxLabel: "Tax:",
+        totalLabel: "Total:",
+        footerText: "Thank you for your business!"
+      },
+      colors: {
+        primary: "#EF4B24",
+        secondary: "#fff7ed",
+        text: "#333333",
+        headerText: "#ffffff"
+      },
+      fonts: {
+        main: "Arial",
+        size: "normal"
+      }
+    }
+  };
+};
+
 export const generateQuotePDF = (quote, customer) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -231,20 +318,43 @@ export const generateQuotePDF = (quote, customer) => {
   // Get language-specific translations
   const language = customer?.contact_language || 'english';
   const t = getTranslations(customer);
-
-  // Header
-  doc.setFontSize(20);
-  doc.setTextColor(79, 70, 229); // Indigo color
-  doc.text(t.quote, pageWidth / 2, 20, { align: 'center' });
   
-  // Company info (you can customize this)
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Promocups', margin, 40);
-  doc.text('Your Sales Management Solution', margin, 50);
+  // Get template settings
+  const templates = getPdfTemplates();
+  const template = templates.quote;
+  
+  // Set font based on template
+  doc.setFont(template.fonts.main || 'Arial');
+  
+  // Set font size based on template
+  let baseFontSize = 12;
+  if (template.fonts.size === 'small') baseFontSize = 10;
+  if (template.fonts.size === 'large') baseFontSize = 14;
+  
+  // Header
+  doc.setFillColor(template.colors.primary || '#4f46e5');
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(template.colors.headerText || '#ffffff');
+  doc.setFontSize(baseFontSize + 8);
+  doc.setFont(template.fonts.main || 'Arial', 'bold');
+  doc.text(template.header.title || t.quote, pageWidth / 2, 20, { align: 'center' });
+  
+  // Company info
+  doc.setFontSize(baseFontSize);
+  doc.setFont(template.fonts.main || 'Arial', 'normal');
+  const companyInfoLines = (template.header.companyInfo || 'Promocups\nYour Sales Management Solution').split('\n');
+  let yPos = 30;
+  companyInfoLines.forEach(line => {
+    doc.text(line, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 6;
+  });
+  
+  // Reset text color for body
+  doc.setTextColor(template.colors.text || '#333333');
   
   // Quote details
-  doc.setFontSize(12);
+  doc.setFontSize(baseFontSize);
   doc.text(`${t.quoteNumber} ${quote.quote_number || quote.id.slice(0, 8)}`, margin, 70);
   doc.text(`${t.date} ${format(new Date(quote.created_at), 'dd/MM/yyyy')}`, margin, 80);
   if (quote.valid_until) {
@@ -252,11 +362,11 @@ export const generateQuotePDF = (quote, customer) => {
   }
 
   // Customer Details
-  doc.setFontSize(14);
-  doc.setTextColor(79, 70, 229);
-  doc.text(t.billTo, margin, 110);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#4f46e5');
+  doc.text(template.content.customerTitle || t.billTo, margin, 110);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
   doc.text(`${customer.company_name}`, margin, 125);
   doc.text(`${customer.first_name} ${customer.last_name}`, margin, 135);
   doc.text(`${customer.email}`, margin, 145);
@@ -266,33 +376,34 @@ export const generateQuotePDF = (quote, customer) => {
   if (customer.address) {
     // Split long addresses into multiple lines
     const addressLines = doc.splitTextToSize(customer.address, 80);
-    let yPos = 165;
+    let addressYPos = 165;
     addressLines.forEach(line => {
-      doc.text(line, margin, yPos);
-      yPos += 10;
+      doc.text(line, margin, addressYPos);
+      addressYPos += 10;
     });
   }
 
   // Quote title and description
   let currentY = 185;
   if (quote.title) {
-    doc.setFontSize(14);
-    doc.setTextColor(79, 70, 229);
-    doc.text(t.quoteTitle, margin, currentY);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(baseFontSize + 2);
+    doc.setTextColor(template.colors.primary || '#4f46e5');
+    doc.text(template.content.quoteTitle || t.quoteTitle, margin, currentY);
+    doc.setFontSize(baseFontSize);
+    doc.setTextColor(template.colors.text || '#333333');
     currentY += 15;
     doc.text(quote.title, margin, currentY);
     currentY += 15;
   }
 
   if (quote.description) {
-    doc.setFontSize(12);
-    doc.setTextColor(79, 70, 229);
-    doc.text(t.description, margin, currentY);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(baseFontSize + 2);
+    doc.setTextColor(template.colors.primary || '#4f46e5');
+    doc.text(template.content.descriptionTitle || t.description, margin, currentY);
+    doc.setTextColor(template.colors.text || '#333333');
     currentY += 15;
     const descLines = doc.splitTextToSize(quote.description, pageWidth - 2 * margin);
+    doc.setFontSize(baseFontSize);
     descLines.forEach(line => {
       doc.text(line, margin, currentY);
       currentY += 10;
@@ -302,18 +413,25 @@ export const generateQuotePDF = (quote, customer) => {
 
   // Quote Items (if available)
   if (quote.items && quote.items.length > 0) {
-    doc.setFontSize(14);
-    doc.setTextColor(79, 70, 229);
-    doc.text(t.items, margin, currentY);
+    doc.setFontSize(baseFontSize + 2);
+    doc.setTextColor(template.colors.primary || '#4f46e5');
+    doc.text(template.content.itemsTitle || t.items, margin, currentY);
     currentY += 15;
 
     // Table headers
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-    doc.text(t.description, margin, currentY);
-    doc.text(t.qty, 120, currentY);
-    doc.text(t.price, 150, currentY);
-    doc.text(t.total, 180, currentY);
+    doc.setFontSize(baseFontSize - 2);
+    doc.setTextColor(template.colors.text || '#333333');
+    
+    // Use template columns or defaults
+    const columns = template.content.itemsColumns || [t.description, t.qty, t.price, t.total];
+    const colWidths = [100, 20, 30, 30]; // Adjust based on your needs
+    let xPos = margin;
+    
+    columns.forEach((col, index) => {
+      doc.text(col, xPos, currentY);
+      xPos += colWidths[index];
+    });
+    
     currentY += 10;
 
     // Draw line under headers
@@ -325,28 +443,37 @@ export const generateQuotePDF = (quote, customer) => {
         doc.addPage();
         currentY = 20;
       }
-      doc.text(item.description.substring(0, 40), margin, currentY);
-      doc.text(item.quantity.toString(), 120, currentY);
-      doc.text(formatCurrency(item.price, language), 150, currentY);
-      doc.text(formatCurrency(item.quantity * item.price, language), 180, currentY);
+      
+      xPos = margin;
+      doc.text(item.description.substring(0, 40), xPos, currentY);
+      xPos += colWidths[0];
+      
+      doc.text(item.quantity.toString(), xPos, currentY);
+      xPos += colWidths[1];
+      
+      doc.text(formatCurrency(item.price, language), xPos, currentY);
+      xPos += colWidths[2];
+      
+      doc.text(formatCurrency(item.quantity * item.price, language), xPos, currentY);
+      
       currentY += 10;
     });
   }
 
   // Totals
   currentY += 15;
-  doc.setFontSize(12);
-  doc.text(t.subtotal, 150, currentY);
+  doc.setFontSize(baseFontSize);
+  doc.text(template.content.subtotalLabel || t.subtotal, 150, currentY);
   doc.text(formatCurrency(quote.subtotal || 0, language), 180, currentY);
   
   currentY += 10;
-  doc.text(t.tax, 150, currentY);
+  doc.text(template.content.taxLabel || t.tax, 150, currentY);
   doc.text(formatCurrency(quote.tax || 0, language), 180, currentY);
   
   currentY += 10;
-  doc.setFontSize(14);
-  doc.setTextColor(79, 70, 229);
-  doc.text(t.total, 150, currentY);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#4f46e5');
+  doc.text(template.content.totalLabel || t.total, 150, currentY);
   doc.text(formatCurrency(quote.total || 0, language), 180, currentY);
 
   // Terms and conditions
@@ -356,23 +483,23 @@ export const generateQuotePDF = (quote, customer) => {
     currentY = 20;
   }
   
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  doc.text(t.termsAndConditions, margin, currentY);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
+  doc.text(template.content.termsTitle || t.termsAndConditions, margin, currentY);
   currentY += 10;
-  doc.text(t.term1, margin, currentY);
-  currentY += 8;
-  doc.text(t.term2, margin, currentY);
-  currentY += 8;
-  doc.text(t.term3, margin, currentY);
-  currentY += 8;
-  doc.text(t.term4, margin, currentY);
+  
+  // Use template terms or defaults
+  const terms = template.content.terms || [t.term1, t.term2, t.term3, t.term4];
+  terms.forEach(term => {
+    doc.text(term, margin, currentY);
+    currentY += 8;
+  });
 
   // Footer
   currentY += 20;
   doc.setFontSize(8);
   doc.setTextColor(128, 128, 128);
-  doc.text(t.thankYou, pageWidth / 2, currentY, { align: 'center' });
+  doc.text(template.content.footerText || t.thankYou, pageWidth / 2, currentY, { align: 'center' });
 
   return doc;
 };
@@ -385,29 +512,52 @@ export const generateOrderPDF = (order, customer) => {
   // Get language-specific translations
   const language = customer?.contact_language || 'english';
   const t = getTranslations(customer);
-
+  
+  // Get template settings
+  const templates = getPdfTemplates();
+  const template = templates.order;
+  
+  // Set font based on template
+  doc.setFont(template.fonts.main || 'Arial');
+  
+  // Set font size based on template
+  let baseFontSize = 12;
+  if (template.fonts.size === 'small') baseFontSize = 10;
+  if (template.fonts.size === 'large') baseFontSize = 14;
+  
   // Header
-  doc.setFontSize(20);
-  doc.setTextColor(239, 75, 36); // Orange color
-  doc.text(t.order, pageWidth / 2, 20, { align: 'center' });
+  doc.setFillColor(template.colors.primary || '#EF4B24');
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  doc.setTextColor(template.colors.headerText || '#ffffff');
+  doc.setFontSize(baseFontSize + 8);
+  doc.setFont(template.fonts.main || 'Arial', 'bold');
+  doc.text(template.header.title || t.order, pageWidth / 2, 20, { align: 'center' });
   
   // Company info
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Promocups', margin, 40);
-  doc.text('Your Sales Management Solution', margin, 50);
+  doc.setFontSize(baseFontSize);
+  doc.setFont(template.fonts.main || 'Arial', 'normal');
+  const companyInfoLines = (template.header.companyInfo || 'Promocups\nYour Sales Management Solution').split('\n');
+  let yPos = 30;
+  companyInfoLines.forEach(line => {
+    doc.text(line, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 6;
+  });
+  
+  // Reset text color for body
+  doc.setTextColor(template.colors.text || '#333333');
   
   // Order details
-  doc.setFontSize(12);
+  doc.setFontSize(baseFontSize);
   doc.text(`${t.orderNumber} ${order.quote_number || order.id.slice(0, 8)}`, margin, 70);
   doc.text(`${t.orderDate} ${format(new Date(order.created_at), 'dd/MM/yyyy')}`, margin, 80);
   
   // Customer Details
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.billTo, margin, 100);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.customerTitle || t.billTo, margin, 100);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
   doc.text(`${customer.company_name}`, margin, 115);
   doc.text(`${customer.first_name} ${customer.last_name}`, margin, 125);
   doc.text(`${customer.email}`, margin, 135);
@@ -416,50 +566,50 @@ export const generateOrderPDF = (order, customer) => {
   }
 
   // Shipping Address
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.shippingAddress, margin, 165);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.shippingTitle || t.shippingAddress, margin, 165);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
   
   if (order.shipping_address) {
     // Split long addresses into multiple lines
     const addressLines = doc.splitTextToSize(order.shipping_address, 80);
-    let yPos = 180;
+    let addressYPos = 180;
     addressLines.forEach(line => {
-      doc.text(line, margin, yPos);
-      yPos += 10;
+      doc.text(line, margin, addressYPos);
+      addressYPos += 10;
     });
   }
 
   // Order Status
   let currentY = 210;
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.orderStatus, margin, currentY);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.statusTitle || t.orderStatus, margin, currentY);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
   currentY += 10;
   doc.text(translateStatus(order.status, language), margin, currentY);
   
   // Payment Status
   currentY += 15;
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.paymentStatus, margin, currentY);
-  doc.setFontSize(12);
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.paymentTitle || t.paymentStatus, margin, currentY);
+  doc.setFontSize(baseFontSize);
+  doc.setTextColor(template.colors.text || '#333333');
   currentY += 10;
   doc.text(translateStatus(order.payment_status, language), margin, currentY);
   
   // Tracking Information
   if (order.tracking_number) {
     currentY += 15;
-    doc.setFontSize(14);
-    doc.setTextColor(239, 75, 36);
-    doc.text(t.trackingNumber, margin, currentY);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(baseFontSize + 2);
+    doc.setTextColor(template.colors.primary || '#EF4B24');
+    doc.text(template.content.trackingTitle || t.trackingNumber, margin, currentY);
+    doc.setFontSize(baseFontSize);
+    doc.setTextColor(template.colors.text || '#333333');
     currentY += 10;
     doc.text(order.tracking_number, margin, currentY);
   }
@@ -469,21 +619,21 @@ export const generateOrderPDF = (order, customer) => {
     const delivery = order.delivery[0];
     
     currentY += 15;
-    doc.setFontSize(14);
-    doc.setTextColor(239, 75, 36);
-    doc.text(t.carrier, margin, currentY);
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(baseFontSize + 2);
+    doc.setTextColor(template.colors.primary || '#EF4B24');
+    doc.text(template.content.deliveryTitle || t.carrier, margin, currentY);
+    doc.setFontSize(baseFontSize);
+    doc.setTextColor(template.colors.text || '#333333');
     currentY += 10;
     doc.text(delivery.carrier?.toUpperCase() || 'N/A', margin, currentY);
     
     if (delivery.estimated_delivery) {
       currentY += 15;
-      doc.setFontSize(14);
-      doc.setTextColor(239, 75, 36);
-      doc.text(t.estimatedDelivery, margin, currentY);
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(baseFontSize + 2);
+      doc.setTextColor(template.colors.primary || '#EF4B24');
+      doc.text(template.content.estimatedDelivery || t.estimatedDelivery, margin, currentY);
+      doc.setFontSize(baseFontSize);
+      doc.setTextColor(template.colors.text || '#333333');
       currentY += 10;
       doc.text(format(new Date(delivery.estimated_delivery), 'dd/MM/yyyy'), margin, currentY);
     }
@@ -496,18 +646,25 @@ export const generateOrderPDF = (order, customer) => {
     currentY = 20;
   }
   
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.items, margin, currentY);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.itemsTitle || t.items, margin, currentY);
   currentY += 15;
 
   // Table headers
-  doc.setFontSize(10);
-  doc.setTextColor(0, 0, 0);
-  doc.text(t.description, margin, currentY);
-  doc.text(t.qty, 120, currentY);
-  doc.text(t.price, 150, currentY);
-  doc.text(t.total, 180, currentY);
+  doc.setFontSize(baseFontSize - 2);
+  doc.setTextColor(template.colors.text || '#333333');
+  
+  // Use template columns or defaults
+  const columns = template.content.itemsColumns || [t.description, t.qty, t.price, t.total];
+  const colWidths = [100, 20, 30, 30]; // Adjust based on your needs
+  let xPos = margin;
+  
+  columns.forEach((col, index) => {
+    doc.text(col, xPos, currentY);
+    xPos += colWidths[index];
+  });
+  
   currentY += 10;
 
   // Draw line under headers
@@ -527,10 +684,18 @@ export const generateOrderPDF = (order, customer) => {
       const unitPrice = item.unit_price || 0;
       const totalPrice = item.total_price || (quantity * unitPrice);
       
-      doc.text(description.substring(0, 40), margin, currentY);
-      doc.text(quantity.toString(), 120, currentY);
-      doc.text(formatCurrency(unitPrice, language), 150, currentY);
-      doc.text(formatCurrency(totalPrice, language), 180, currentY);
+      xPos = margin;
+      doc.text(description.substring(0, 40), xPos, currentY);
+      xPos += colWidths[0];
+      
+      doc.text(quantity.toString(), xPos, currentY);
+      xPos += colWidths[1];
+      
+      doc.text(formatCurrency(unitPrice, language), xPos, currentY);
+      xPos += colWidths[2];
+      
+      doc.text(formatCurrency(totalPrice, language), xPos, currentY);
+      
       currentY += 10;
     });
   } else {
@@ -540,16 +705,16 @@ export const generateOrderPDF = (order, customer) => {
 
   // Total
   currentY += 15;
-  doc.setFontSize(14);
-  doc.setTextColor(239, 75, 36);
-  doc.text(t.total, 150, currentY);
+  doc.setFontSize(baseFontSize + 2);
+  doc.setTextColor(template.colors.primary || '#EF4B24');
+  doc.text(template.content.totalLabel || t.total, 150, currentY);
   doc.text(formatCurrency(order.total_amount || 0, language), 180, currentY);
 
   // Footer
   currentY += 20;
   doc.setFontSize(8);
   doc.setTextColor(128, 128, 128);
-  doc.text(t.thankYou, pageWidth / 2, currentY, { align: 'center' });
+  doc.text(template.content.footerText || t.thankYou, pageWidth / 2, currentY, { align: 'center' });
 
   return doc;
 };

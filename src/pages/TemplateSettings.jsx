@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/layout/Header";
 import TemplateManager from "@/components/templates/TemplateManager";
+import PdfTemplateManager from "@/components/templates/PdfTemplateManager";
 
 const TemplateSettings = () => {
   const [activeTab, setActiveTab] = React.useState("email");
@@ -69,13 +70,7 @@ const TemplateSettings = () => {
                   </TabsContent>
                   
                   <TabsContent value="pdf">
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-700">PDF Template Management</h3>
-                      <p className="text-gray-500 max-w-md mx-auto mt-2">
-                        PDF template customization is coming soon. This feature will allow you to customize the layout and design of your quote and order PDFs.
-                      </p>
-                    </div>
+                    <PdfTemplateManager />
                   </TabsContent>
                   
                   <TabsContent value="notification">
