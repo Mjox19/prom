@@ -306,7 +306,7 @@ const defaultTemplates = {
         <p><strong>Tracking Number:</strong> {{tracking_number}}</p>
         {{/if}}
         <p><strong>Delivery Address:</strong><br>{{shipping_address}}</p>
-        <p><strong>Order Value:</strong> ${{order_amount}}</p>
+        <p><strong>Order Value:</strong> &dollar;{{order_amount}}</p>
       </div>
       
       <p><strong>Please ensure someone is available to receive your delivery.</strong></p>
