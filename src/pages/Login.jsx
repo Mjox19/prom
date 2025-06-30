@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,12 +28,12 @@ const Login = () => {
 
   // Redirect if already authenticated and auth is initialized
   useEffect(() => {
-    if (initialized && user && !configError) {
+    if (initialized && user && !configError && !loginSuccess) {
       console.log('✅ User already authenticated, redirecting...');
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
-  }, [user, initialized, configError, navigate, location]);
+  }, [user, initialized, configError, navigate, location, loginSuccess]);
 
   // Don't render login form if we're still checking auth
   if (!initialized) {
@@ -48,7 +49,7 @@ const Login = () => {
   }
 
   // If user is authenticated, don't render anything (will redirect via useEffect)
-  if (user && !configError) {
+  if (user && !configError && !loginSuccess) {
     console.log('✅ User authenticated, will redirect...');
     return null;
   }
@@ -108,6 +109,53 @@ const Login = () => {
     );
   }
 
+  // Show login success screen
+  if (loginSuccess) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/logo promocups Normal.png" 
+                alt="Promocups" 
+                className="h-12 w-auto"
+              />
+            </div>
+            <p className="text-gray-600">Sales Management System</p>
+          </div>
+          
+          <Card className="border border-green-200 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-green-600 flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 mr-2" />
+                Login Successful
+              </CardTitle>
+              <CardDescription className="text-center">
+                Welcome back to Promocups Sales Management
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="mb-4">You have successfully logged in.</p>
+              <p className="text-sm text-gray-600">Click the button below to continue to your dashboard.</p>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                onClick={() => {
+                  const from = location.state?.from?.pathname || '/';
+                  navigate(from, { replace: true });
+                }} 
+                className="w-full bg-orange-500 hover:bg-orange-600"
+              >
+                Continue to Dashboard
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   const handleLogin = async (e) => {
     e.preventDefault();
     
@@ -130,8 +178,9 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Don't force reload, let the auth state change handle navigation
-      console.log('✅ Login successful, auth state will handle navigation');
+      // Show success screen instead of redirecting immediately
+      setLoginSuccess(true);
+      console.log('✅ Login successful, showing confirmation screen');
     } catch (error) {
       console.error('Login error:', error);
       toast({
