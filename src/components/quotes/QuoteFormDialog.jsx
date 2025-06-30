@@ -9,9 +9,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import { Plus, Trash2 } from "lucide-react";
 import { getProducts, getProductPriceForQuantity } from "@/lib/productData";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => {
   const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
   
   const initialValues = {
     customerId: quoteToEdit?.customer_id || "",
@@ -56,7 +58,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   } = useFormValidation(initialValues, rules);
 
   useEffect(() => {
-    setAllProducts(getProducts());
+    loadProducts();
   }, []);
 
   useEffect(() => {
@@ -68,6 +70,40 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
       reset();
     }
   }, [quoteToEdit]);
+
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      if (!isSupabaseConfigured) {
+        // Use local storage products in demo mode
+        const products = getProducts();
+        setAllProducts(products);
+      } else {
+        // Fetch products from Supabase
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .order('name', { ascending: true });
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setAllProducts(data);
+        } else {
+          // Fallback to local storage if no products in database
+          const products = getProducts();
+          setAllProducts(products);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      // Fallback to local storage on error
+      const products = getProducts();
+      setAllProducts(products);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleItemChange = (index, field, value) => {
     const updatedItems = [...values.items];
