@@ -29,9 +29,11 @@ const Products = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       seedProducts();
-      setProductsState(getProducts());
+      const productsData = await getProducts();
+      setProductsState(Array.isArray(productsData) ? productsData : []);
     } catch (error) {
       console.error('Error loading products:', error);
+      setProductsState([]);
       toast({
         title: "Error",
         description: "Failed to load products. Please try again.",
@@ -104,10 +106,10 @@ const Products = () => {
     setIsFormDialogOpen(true);
   };
 
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = Array.isArray(products) ? products.filter(product => 
     (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ) : [];
 
   return (
     <div className="h-full flex flex-col">
