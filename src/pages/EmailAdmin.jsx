@@ -168,26 +168,6 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Check if form is valid for submission
-  const isFormValid = () => {
-    // Basic validation for required fields
-    if (!values.host || !values.port || !values.from || !values.fromName) {
-      return false;
-    }
-    
-    // Check for validation errors
-    if (Object.keys(errors).length > 0) {
-      return false;
-    }
-    
-    // If auth is enabled, check credentials
-    if (values.auth && (!values.username || !values.password)) {
-      return false;
-    }
-    
-    return true;
-  };
-
   const handleTestConnection = async () => {
     // Touch all fields to show validation errors
     setFieldTouched("host");
@@ -199,7 +179,10 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
       setFieldTouched("password");
     }
     
-    if (!isFormValid()) {
+    // Use validateAll() to ensure all validations are processed synchronously
+    const formIsValid = validateAll();
+    
+    if (!formIsValid) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields correctly before testing the connection.",
@@ -252,7 +235,10 @@ const SmtpSettingsDialog = ({ open, onOpenChange, onSave, currentSettings }) => 
       setFieldTouched("password");
     }
     
-    if (!isFormValid()) {
+    // Use validateAll() to ensure all validations are processed synchronously
+    const formIsValid = validateAll();
+    
+    if (!formIsValid) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields correctly before saving.",
