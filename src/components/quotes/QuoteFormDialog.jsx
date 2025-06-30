@@ -9,7 +9,6 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ValidatedInput, useFormValidation, validationRules } from "@/components/ui/form-validation";
 import { Plus, Trash2 } from "lucide-react";
 import { getProducts, getProductPriceForQuantity } from "@/lib/productData";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => {
   const [allProducts, setAllProducts] = useState([]);
@@ -74,32 +73,11 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        // Use local storage products in demo mode
-        const products = getProducts();
-        setAllProducts(products);
-      } else {
-        // Fetch products from Supabase
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('name', { ascending: true });
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setAllProducts(data);
-        } else {
-          // Fallback to local storage if no products in database
-          const products = getProducts();
-          setAllProducts(products);
-        }
-      }
+      const products = await getProducts();
+      setAllProducts(products);
     } catch (error) {
       console.error('Error loading products:', error);
-      // Fallback to local storage on error
-      const products = getProducts();
-      setAllProducts(products);
+      setAllProducts([]);
     } finally {
       setLoading(false);
     }
@@ -270,68 +248,72 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <Plus className="h-4 w-4 mr-1" />Add Item
             </Button>
           </div>
-          {values.items.map((item, index) => (
-            <div key={index} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
-              <div className="col-span-4 space-y-1">
-                <Label className="text-xs">Product</Label>
-                <Select value={item.productId} onValueChange={(value) => handleItemChange(index, "productId", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allProducts.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-4 space-y-1">
-                <Label className="text-xs">Description</Label>
-                <Input 
-                  value={item.description} 
-                  onChange={(e) => handleItemChange(index, "description", e.target.value)} 
-                  placeholder="Item description" 
-                />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <Label className="text-xs">Quantity</Label>
-                <Input 
-                  type="number" 
-                  value={item.quantity} 
-                  onChange={(e) => handleItemChange(index, "quantity", e.target.value)} 
-                  placeholder="Qty" 
-                  min="1" 
-                />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <Label className="text-xs">Price</Label>
-                <Input 
-                  type="number" 
-                  value={item.price} 
-                  onChange={(e) => handleItemChange(index, "price", e.target.value)} 
-                  placeholder="Price" 
-                  min="0" 
-                  step="0.01" 
-                  disabled={!item.manualPrice && item.quantity <= 10000} 
-                />
-              </div>
-              <div className="col-span-11 text-right text-sm font-medium">
-                ${(item.quantity * item.price).toFixed(2)}
-              </div>
-              <div className="col-span-1 flex justify-end">
-                {values.items.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+          {loading ? (
+            <div className="text-center py-4">Loading products...</div>
+          ) : (
+            values.items.map((item, index) => (
+              <div key={index} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
+                <div className="col-span-4 space-y-1">
+                  <Label className="text-xs">Product</Label>
+                  <Select value={item.productId} onValueChange={(value) => handleItemChange(index, "productId", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allProducts.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-4 space-y-1">
+                  <Label className="text-xs">Description</Label>
+                  <Input 
+                    value={item.description} 
+                    onChange={(e) => handleItemChange(index, "description", e.target.value)} 
+                    placeholder="Item description" 
+                  />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Quantity</Label>
+                  <Input 
+                    type="number" 
+                    value={item.quantity} 
+                    onChange={(e) => handleItemChange(index, "quantity", e.target.value)} 
+                    placeholder="Qty" 
+                    min="1" 
+                  />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs">Price</Label>
+                  <Input 
+                    type="number" 
+                    value={item.price} 
+                    onChange={(e) => handleItemChange(index, "price", e.target.value)} 
+                    placeholder="Price" 
+                    min="0" 
+                    step="0.01" 
+                    disabled={!item.manualPrice && item.quantity <= 10000} 
+                  />
+                </div>
+                <div className="col-span-11 text-right text-sm font-medium">
+                  ${(item.quantity * item.price).toFixed(2)}
+                </div>
+                <div className="col-span-1 flex justify-end">
+                  {values.items.length > 1 && (
+                    <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  )}
+                </div>
+                {item.manualPrice && item.quantity > 10000 && (
+                  <div className="col-span-12 text-xs text-amber-600">
+                    Manual price entry enabled for quantity over 10,000.
+                  </div>
                 )}
               </div>
-              {item.manualPrice && item.quantity > 10000 && (
-                <div className="col-span-12 text-xs text-amber-600">
-                  Manual price entry enabled for quantity over 10,000.
-                </div>
-              )}
-            </div>
-          ))}
+            ))
+          )}
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span>Subtotal:</span>
@@ -352,7 +334,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!isFormValid}
+          disabled={!isFormValid || loading}
         >
           {quoteToEdit ? "Save Changes" : "Create Quote"}
         </Button>

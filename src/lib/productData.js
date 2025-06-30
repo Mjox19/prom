@@ -1,38 +1,170 @@
 import { getAllItems, getItemById, addItem, updateItem, deleteItem } from '@/lib/localStorageUtils';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
 const PRODUCTS_KEY = 'products';
 
-export const getProducts = () => {
-  const products = getAllItems(PRODUCTS_KEY);
-  if (products.length === 0) {
-    seedProducts();
-    return getAllItems(PRODUCTS_KEY);
+export const getProducts = async () => {
+  if (!isSupabaseConfigured) {
+    // Use local storage in demo mode
+    const products = getAllItems(PRODUCTS_KEY);
+    if (products.length === 0) {
+      seedProducts();
+      return getAllItems(PRODUCTS_KEY);
+    }
+    return products;
   }
-  return products;
+
+  try {
+    // Fetch from Supabase
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('name', { ascending: true });
+      
+    if (error) throw error;
+    
+    // Transform price_tiers to priceTiers for compatibility
+    const transformedData = data?.map(product => ({
+      ...product,
+      priceTiers: product.price_tiers || []
+    })) || [];
+    
+    return transformedData;
+  } catch (error) {
+    console.error('Error fetching products from Supabase:', error);
+    // Fallback to local storage
+    const products = getAllItems(PRODUCTS_KEY);
+    if (products.length === 0) {
+      seedProducts();
+      return getAllItems(PRODUCTS_KEY);
+    }
+    return products;
+  }
 };
 
-export const getProductById = (id) => getItemById(PRODUCTS_KEY, id);
+export const getProductById = async (id) => {
+  if (!isSupabaseConfigured) {
+    return getItemById(PRODUCTS_KEY, id);
+  }
 
-export const addProduct = (product) => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (error) throw error;
+    
+    // Transform price_tiers to priceTiers for compatibility
+    return {
+      ...data,
+      priceTiers: data.price_tiers || []
+    };
+  } catch (error) {
+    console.error('Error fetching product from Supabase:', error);
+    return getItemById(PRODUCTS_KEY, id);
+  }
+};
+
+export const addProduct = async (product) => {
   const defaultTiers = [{ upToQuantity: 10000, price: product.price || 0 }];
   const productToAdd = {
     ...product,
     priceTiers: product.priceTiers && product.priceTiers.length > 0 ? product.priceTiers : defaultTiers,
   };
   delete productToAdd.price; // Remove single price if tiers are used
-  return addItem(PRODUCTS_KEY, productToAdd);
+
+  if (!isSupabaseConfigured) {
+    return addItem(PRODUCTS_KEY, productToAdd);
+  }
+
+  try {
+    // Transform priceTiers to price_tiers for Supabase
+    const supabaseProduct = {
+      ...productToAdd,
+      price_tiers: productToAdd.priceTiers
+    };
+    delete supabaseProduct.priceTiers;
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert([supabaseProduct])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Transform back for return
+    return {
+      ...data,
+      priceTiers: data.price_tiers || []
+    };
+  } catch (error) {
+    console.error('Error adding product to Supabase:', error);
+    return addItem(PRODUCTS_KEY, productToAdd);
+  }
 };
 
-export const updateProduct = (id, updatedData) => {
+export const updateProduct = async (id, updatedData) => {
   const productToUpdate = { ...updatedData };
   if (productToUpdate.priceTiers && productToUpdate.priceTiers.length > 0) {
     delete productToUpdate.price;
   }
-  return updateItem(PRODUCTS_KEY, id, productToUpdate);
+
+  if (!isSupabaseConfigured) {
+    return updateItem(PRODUCTS_KEY, id, productToUpdate);
+  }
+
+  try {
+    // Transform priceTiers to price_tiers for Supabase
+    const supabaseProduct = {
+      ...productToUpdate,
+      price_tiers: productToUpdate.priceTiers,
+      updated_at: new Date().toISOString()
+    };
+    delete supabaseProduct.priceTiers;
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(supabaseProduct)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    // Transform back for return
+    return {
+      ...data,
+      priceTiers: data.price_tiers || []
+    };
+  } catch (error) {
+    console.error('Error updating product in Supabase:', error);
+    return updateItem(PRODUCTS_KEY, id, productToUpdate);
+  }
 };
 
-export const deleteProduct = (id) => deleteItem(PRODUCTS_KEY, id);
+export const deleteProduct = async (id) => {
+  if (!isSupabaseConfigured) {
+    return deleteItem(PRODUCTS_KEY, id);
+  }
+
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
+      
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting product from Supabase:', error);
+    return deleteItem(PRODUCTS_KEY, id);
+  }
+};
 
 export const seedProducts = () => {
   const existingProducts = getAllItems(PRODUCTS_KEY);
