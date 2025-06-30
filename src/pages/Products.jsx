@@ -51,10 +51,10 @@ const Products = () => {
   const handleFormSubmit = async (productData) => {
     try {
       if (selectedProduct) {
-        updateProduct(selectedProduct.id, productData);
+        await updateProduct(selectedProduct.id, productData);
         toast({ title: "Product updated", description: "The product has been successfully updated." });
       } else {
-        addProduct(productData);
+        await addProduct(productData);
         toast({ title: "Product added", description: "The product has been successfully added." });
       }
       
@@ -85,7 +85,7 @@ const Products = () => {
   const handleDeleteProduct = async () => {
     if (selectedProduct) {
       try {
-        deleteProduct(selectedProduct.id);
+        await deleteProduct(selectedProduct.id);
         await loadProducts();
         setIsDeleteDialogOpen(false);
         setSelectedProduct(null);
