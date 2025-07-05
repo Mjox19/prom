@@ -471,7 +471,7 @@ export const generateQuotePDF = (quote, customer) => {
   doc.text(formatCurrency(quote.subtotal || 0, language), 180, currentY);
   
   currentY += 10;
-  doc.text(template.content.taxLabel || t.tax, 150, currentY);
+  doc.text(template.content.taxLabel || t.tax + " (21%)", 150, currentY);
   doc.text(formatCurrency(quote.tax || 0, language), 180, currentY);
   
   currentY += 10;
