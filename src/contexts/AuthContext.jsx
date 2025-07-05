@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [configError, setConfigError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // Auto-logout configuration
   const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -117,6 +118,7 @@ export const AuthProvider = ({ children }) => {
   // Initialize auth state
   useEffect(() => {
     mountedRef.current = true;
+    console.log('🔄 Auth context initializing or refreshing...', refreshTrigger);
     
     const initAuth = async () => {
       // Prevent multiple initializations
@@ -130,7 +132,7 @@ export const AuthProvider = ({ children }) => {
       try {
         console.log('🔄 Initializing auth...', { isSupabaseConfigured });
         
-        if (!isSupabaseConfigured) {
+        if (!isSupabaseConfigured && mountedRef.current) {
           console.warn('⚠️ Supabase not configured, using demo mode');
           if (mountedRef.current) {
             setConfigError('Supabase configuration is missing or invalid');
@@ -143,6 +145,7 @@ export const AuthProvider = ({ children }) => {
         // Get current session without triggering auth state changes
         console.log('🔍 Checking for existing session...');
         const { data, error } = await supabase.auth.getSession();
+        console.log('Session check result:', data?.session ? 'Found session' : 'No session', error ? `Error: ${error.message}` : '');
         
         if (error) {
           console.error('❌ Error getting session:', error);
@@ -157,17 +160,18 @@ export const AuthProvider = ({ children }) => {
         const session = data?.session;
         const currentUser = session?.user || null;
         
+        if (mountedRef.current && currentUser) {
+          console.log('✅ Found existing session for user:', currentUser.id);
+          setUser(currentUser);
+          await fetchUserProfile(currentUser.id);
+          resetInactivityTimer();
+        } else if (mountedRef.current) {
+          console.log('ℹ️ No existing session found');
+          setUser(null);
+          setUserProfile(null);
+        }
+        
         if (mountedRef.current) {
-          if (currentUser) {
-            console.log('✅ Found existing session for user:', currentUser.id);
-            setUser(currentUser);
-            await fetchUserProfile(currentUser.id);
-          } else {
-            console.log('ℹ️ No existing session found');
-            setUser(null);
-            setUserProfile(null);
-          }
-          
           setLoading(false);
           setInitialized(true);
         }
@@ -208,11 +212,11 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('❌ Error in auth initialization:', error);
-        if (mountedRef.current) {
-          setConfigError(`Initialization error: ${error.message}`);
-          setLoading(false);
-          setInitialized(true);
-        }
+          if (currentUser) {
+            setConfigError(`Initialization error: ${error.message}`);
+            setLoading(false);
+            setInitialized(true);
+          }
       }
     };
 
@@ -236,7 +240,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       mountedRef.current = false;
       
-      // Clean up auth listener
+      // Clean up auth listener if it exists
       if (authSubscription && typeof authSubscription.then === 'function') {
         authSubscription.then(subscription => {
           if (subscription && subscription.unsubscribe) {
@@ -250,7 +254,7 @@ export const AuthProvider = ({ children }) => {
         document.removeEventListener(event, handleActivity);
       });
       
-      // Clean up timers
+      // Clean up any existing timers
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -258,7 +262,7 @@ export const AuthProvider = ({ children }) => {
         clearTimeout(warningTimeoutRef.current);
       }
     };
-  }, []); // Empty dependency array to run only once
+  }, [refreshTrigger]); // Run when refreshTrigger changes
 
   // Auth context value
   const value = {
@@ -293,6 +297,11 @@ export const AuthProvider = ({ children }) => {
       }
       
       return supabase.auth.signOut();
+    },
+    refreshAuth: () => {
+      // Trigger a refresh of the auth state
+      console.log('🔄 Manually refreshing auth state');
+      setRefreshTrigger(prev => prev + 1);
     },
     updateProfile: async (updates) => {
       if (!isSupabaseConfigured) {
@@ -360,7 +369,7 @@ export const AuthProvider = ({ children }) => {
     // Helper functions for role checking
     isSuperAdmin: () => userProfile?.role === 'super_admin',
     isAdmin: () => userProfile?.role === 'admin' || userProfile?.role === 'super_admin',
-    isUser: () => userProfile?.role === 'user',
+    isUser: () => Boolean(userProfile?.role),
     hasRole: (role) => userProfile?.role === role,
     canManageUsers: () => userProfile?.role === 'super_admin',
     canManageProducts: () => userProfile?.role === 'admin' || userProfile?.role === 'super_admin'

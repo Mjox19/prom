@@ -14,6 +14,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +30,7 @@ const Login = () => {
   // Redirect if already authenticated and auth is initialized
   useEffect(() => {
     if (initialized && user && !configError && !loginSuccess) {
-      console.log('✅ User already authenticated, redirecting...');
+      setRedirecting(true);
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
     }
@@ -38,7 +39,7 @@ const Login = () => {
   // Don't render login form if we're still checking auth
   if (!initialized) {
     console.log('⏳ Login: Waiting for auth initialization...');
-    return (
+    return redirecting ? null : (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
@@ -50,8 +51,19 @@ const Login = () => {
 
   // If user is authenticated, don't render anything (will redirect via useEffect)
   if (user && !configError && !loginSuccess) {
-    console.log('✅ User authenticated, will redirect...');
-    return null;
+    if (!redirecting) {
+      setRedirecting(true);
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
+    }
+    return redirecting ? null : (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   // Show configuration error if Supabase is not configured
@@ -172,8 +184,8 @@ const Login = () => {
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password.trim(),
+        email,
+        password,
       });
 
       if (error) throw error;
@@ -181,6 +193,9 @@ const Login = () => {
       // Show success screen instead of redirecting immediately
       setLoginSuccess(true);
       console.log('✅ Login successful, showing confirmation screen');
+      
+      // Force refresh auth state
+      await supabase.auth.refreshSession();
     } catch (error) {
       console.error('Login error:', error);
       toast({

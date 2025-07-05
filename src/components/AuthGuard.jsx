@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) => {
+const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login', redirectPath = null }) => {
   const { user, userProfile, loading, initialized, configError } = useAuth();
   const location = useLocation();
 
@@ -37,8 +37,7 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
   // If no user after initialization is complete, redirect to login
   if (!user) {
     console.log('🔒 AuthGuard: No user, redirecting to login');
-    // Save the attempted URL for redirecting after login
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to={fallbackPath} state={{ from: redirectPath || location }} replace />;
   }
 
   // Check role-based access if required
@@ -58,7 +57,7 @@ const AuthGuard = ({ children, requiredRole = null, fallbackPath = '/login' }) =
 
     if (!hasRequiredRole()) {
       console.log('🚫 AuthGuard: Insufficient role permissions');
-      return <Navigate to={fallbackPath} replace />;
+      return <Navigate to={fallbackPath} state={{ from: redirectPath || location }} replace />;
     }
   }
 
