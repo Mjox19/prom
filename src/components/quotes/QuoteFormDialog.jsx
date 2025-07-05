@@ -320,7 +320,7 @@ const QuoteFormDialog = ({ onOpenChange, customers, onSubmit, quoteToEdit }) => 
               <span>${values.subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span>Tax (8%):</span>
+              <span>Tax (21%):</span>
               <span>${values.tax.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold">
