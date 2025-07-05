@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
@@ -13,7 +16,14 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
+      '@': path.resolve(__dirname, './src'),
+      // Prevent 'ws' from being bundled for the browser
+      'ws': path.resolve(__dirname, 'src/lib/empty-module.js')
+    }
+  },
+  build: {
+    rollupOptions: {
+      external: ['ws']
     }
   }
 })
