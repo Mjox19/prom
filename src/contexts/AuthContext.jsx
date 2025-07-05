@@ -296,7 +296,18 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Supabase not configured');
       }
       
-      return supabase.auth.signOut();
+      try {
+        return await supabase.auth.signOut();
+      } catch (error) {
+        // If the session doesn't exist on the server, treat it as a successful logout
+        if (error.message?.includes('Session from session_id claim in JWT does not exist') || 
+            error.message?.includes('Invalid session')) {
+          console.log('Session already invalid, treating as successful logout');
+          return { error: null };
+        }
+        // Re-throw other errors to ensure they're still handled properly
+        throw error;
+      }
     },
     refreshAuth: () => {
       // Trigger a refresh of the auth state
